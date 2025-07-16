@@ -1,187 +1,186 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-<meta charset="UTF-8" />
-<title>Zakazivanje termina za slikanje</title>
-<style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    max-width: 500px;
-    margin: 30px auto;
-    background: #f9f9f9;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.1);
-  }
-  h1 {
-    text-align: center;
-    color: #333;
-    margin-bottom: 20px;
-  }
-  form label {
-    display: block;
-    margin-top: 15px;
-    font-weight: 600;
-    color: #555;
-  }
-  input[type="text"],
-  input[type="tel"],
-  input[type="date"],
-  input[type="time"] {
-    margin-top: 6px;
-    width: 100%;
-    padding: 8px 10px;
-    font-size: 16px;
-    border: 1.5px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box;
-    transition: border-color 0.3s;
-  }
-  input[type="text"]:focus,
-  input[type="tel"]:focus,
-  input[type="date"]:focus,
-  input[type="time"]:focus {
-    border-color: #0078d7;
-    outline: none;
-  }
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    margin-top: 15px;
-    font-weight: 600;
-    color: #555;
-  }
-  .checkbox-label input {
-    margin-right: 8px;
-    width: 18px;
-    height: 18px;
-  }
-  button {
-    margin-top: 25px;
-    width: 100%;
-    padding: 12px;
-    background-color: #0078d7;
-    color: white;
-    font-size: 18px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  button:hover {
-    background-color: #005ea2;
-  }
-  .info {
-    margin-top: 12px;
-    font-size: 14px;
-    color: #666;
-    text-align: center;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>Zakazivanje Slikanja</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #eef1f5;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .selector {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    #pretragaSifre {
+      display: block;
+      margin: 0 auto 15px auto;
+      padding: 8px;
+      font-size: 14px;
+      width: 200px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+      max-width: 1200px;
+      margin: auto;
+    }
+    .slot {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 6px;
+    }
+    .slot.filled {
+      background: #dff0d8;
+    }
+    .slot h4 {
+      text-align: center;
+      margin-top: 0;
+    }
+    .slot input {
+      width: 100%;
+      padding: 5px;
+      margin-bottom: 5px;
+      box-sizing: border-box;
+    }
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+  </style>
 </head>
 <body>
+  <h1>Zakazivanje Slikanja</h1>
+  <input id="pretragaSifre" type="text" placeholder="Pretraga po šifri" oninput="pretraziSifru()" />
+  <div class="selector">
+    <label for="datum">Izaberi datum:</label>
+    <input type="date" id="datum" onchange="prikaziTermine()">
+  </div>
+  <div class="grid" id="terminiGrid"></div>
 
-<h1>Zakazivanje termina za slikanje</h1>
+  <script>
+    const SHEET_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLgoUOahSLvetiMiKxtOIDBL7mgTOBFiw6yUic9bcxqnN3ILyyB9iFHHgXiP9sm52RVtr4E-GxN9RAEjJJD03lbYDj-UYTH4ofslij2uXF8O3eprQqapoaypDJ-etCVOn8hk0VVKPOJFgeJFSUHmgGloaEiB_l-c987-2KMLUB2H6_0WOAfQGhP1t8hJDuME4dG_E5XaUWRtaqltKJZsOWRFWJVEnFQNP1nNCRap8U84jxZo88eSDeZzMi8NpaSydWem8bnqtfHBvJSYBhThFlEtgr-mWelNBGsqwzxA&lib=MIPm2ju-ijGXWi5xgI7G-NI5etRJWauVd";
 
-<form id="formaTermin">
-  <label for="datum">Datum:</label>
-  <input type="date" id="datum" required />
+    const startTime = 9;
+    const endTime = 19;
+    const interval = 30;
 
-  <label for="vreme">Vreme termina (09:00 - 19:30):</label>
-  <input
-    type="time"
-    id="vreme"
-    min="09:00"
-    max="19:30"
-    step="900"
-    required
-  />
+    function danasnjiDatum() {
+      const d = new Date();
+      const offset = d.getTimezoneOffset() / -60;
+      d.setHours(d.getHours() + offset);
+      return d.toISOString().split("T")[0];
+    }
 
-  <label for="sifraStana">Šifra stana:</label>
-  <input type="text" id="sifraStana" placeholder="Unesite šifru stana" required />
+    document.getElementById("datum").value = danasnjiDatum();
 
-  <label for="agent">Agent:</label>
-  <input type="text" id="agent" placeholder="Ime agenta" required />
-
-  <label for="adresa">Adresa:</label>
-  <input type="text" id="adresa" placeholder="Unesite adresu" required />
-
-  <label for="telefon">Broj telefona:</label>
-  <input
-    type="tel"
-    id="telefon"
-    placeholder="npr. 0601234567"
-    required
-    pattern="[0-9+\-\s]+"
-  />
-
-  <label class="checkbox-label">
-    <input type="checkbox" id="slikano" />
-    Termin je slikano
-  </label>
-
-  <button type="submit">Sačuvaj termin</button>
-</form>
-
-<div class="info">
-  * Vreme se unosi u koracima od 15 minuta.
-</div>
-
-<script>
-  const datumInput = document.getElementById('datum');
-  const vremeInput = document.getElementById('vreme');
-  const forma = document.getElementById('formaTermin');
-
-  function setujDanasnjiDatum() {
-    const danas = new Date();
-    const yyyy = danas.getFullYear();
-    const mm = (danas.getMonth() + 1).toString().padStart(2, '0');
-    const dd = danas.getDate().toString().padStart(2, '0');
-    datumInput.value = `${yyyy}-${mm}-${dd}`;
-  }
-
-  function posaljiTerminJsonp(terminData, callback) {
-    const baseUrl = 'https://script.google.com/macros/s/AKfycbzfLfS-mJ5xtbp9NeRmETc9MlMyW7Mt99xiujfUJuWcwudmj1iqcsLavPeoZIs44c6qKw/exec';
-    const params = new URLSearchParams(terminData);
-    params.append('callback', 'callbackFunkcija');
-
-    const script = document.createElement('script');
-    script.src = baseUrl + '?' + params.toString();
-    document.body.appendChild(script);
-
-    window.callbackFunkcija = function(response) {
-      callback(response);
-      document.body.removeChild(script);
-      delete window.callbackFunkcija;
-    };
-  }
-
-  forma.addEventListener('submit', e => {
-    e.preventDefault();
-
-    const terminData = {
-      datum: datumInput.value,
-      termin: vremeInput.value,
-      sifraStana: document.getElementById('sifraStana').value.trim(),
-      agent: document.getElementById('agent').value.trim(),
-      adresa: document.getElementById('adresa').value.trim(),
-      telefon: document.getElementById('telefon').value.trim(),
-      slikano: document.getElementById('slikano').checked.toString()
-    };
-
-    posaljiTerminJsonp(terminData, (rezultat) => {
-      if (rezultat.status === 'success') {
-        alert('Termin uspešno dodat!');
-        forma.reset();
-        setujDanasnjiDatum();
-      } else {
-        alert('Greška: ' + (rezultat.message || 'Nepoznata'));
+    function generisiTermine() {
+      const termini = [];
+      for (let h = startTime; h <= endTime; h++) {
+        for (let m = 0; m < 60; m += interval) {
+          termini.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }
       }
-    });
-  });
+      return termini;
+    }
 
-  setujDanasnjiDatum();
-</script>
+    function prikaziTermine() {
+      const grid = document.getElementById("terminiGrid");
+      grid.innerHTML = "";
+      const datum = document.getElementById("datum").value;
+      const termini = generisiTermine();
 
+      termini.forEach(vreme => {
+        const slot = document.createElement("div");
+        slot.className = "slot";
+        const h4 = document.createElement("h4");
+        h4.textContent = vreme;
+        slot.appendChild(h4);
+
+        const sifra = napraviInput("Šifra stana");
+        const agent = napraviInput("Agent");
+        const adresa = napraviInput("Adresa");
+        const telefon = napraviInput("Telefon");
+
+        const checkDiv = document.createElement("div");
+        checkDiv.className = "checkbox";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        const label = document.createElement("label");
+        label.textContent = "Slikano";
+        checkDiv.appendChild(checkbox);
+        checkDiv.appendChild(label);
+
+        slot.appendChild(sifra);
+        slot.appendChild(agent);
+        slot.appendChild(adresa);
+        slot.appendChild(telefon);
+        slot.appendChild(checkDiv);
+
+        [sifra, agent, adresa, telefon, checkbox].forEach(el => {
+          el.addEventListener("input", () => {
+            if (sifra.value.trim() !== "") slot.classList.add("filled");
+            sacuvajTermin(datum, vreme, sifra.value, agent.value, adresa.value, telefon.value, checkbox.checked);
+          });
+        });
+
+        slot.dataset.sifra = sifra.value;
+        grid.appendChild(slot);
+      });
+    }
+
+    function napraviInput(placeholder) {
+      const input = document.createElement("input");
+      input.placeholder = placeholder;
+      return input;
+    }
+
+    function sacuvajTermin(datum, vreme, sifra, agent, adresa, telefon, slikano) {
+      const params = new URLSearchParams({
+        datum,
+        termin: vreme,
+        sifraStana: sifra,
+        agent,
+        adresa,
+        telefon,
+        slikano: slikano.toString(),
+        callback: "callbackFunkcija"
+      });
+
+      const script = document.createElement("script");
+      script.src = SHEET_URL + "?" + params.toString();
+      document.body.appendChild(script);
+
+      window.callbackFunkcija = function(res) {
+        console.log("Sačuvano:", res);
+        document.body.removeChild(script);
+        delete window.callbackFunkcija;
+      };
+    }
+
+    function pretraziSifru() {
+      const query = document.getElementById("pretragaSifre").value.trim().toLowerCase();
+      const sviSlotovi = document.querySelectorAll(".slot");
+      sviSlotovi.forEach(slot => {
+        const sifraInput = slot.querySelector("input[placeholder='Šifra stana']");
+        const val = sifraInput.value.trim().toLowerCase();
+        slot.style.display = val.includes(query) ? "block" : "none";
+      });
+    }
+
+    prikaziTermine();
+  </script>
 </body>
 </html>
+
+
