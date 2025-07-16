@@ -7,25 +7,19 @@
   body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
   label { display: block; margin-top: 10px; }
   input, select { width: 100%; padding: 8px; margin-top: 4px; }
-  button { margin-top: 10px; padding: 10px 20px; }
-  table { width: 100%; margin-top: 20px; border-collapse: collapse; }
-  th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-  th { background: #eee; }
+  button { margin-top: 15px; padding: 10px 20px; cursor: pointer; }
 </style>
 </head>
 <body>
 
 <h1>Zakazivanje termina za slikanje</h1>
 
-<div>
-  <button id="btnPrethodni">Prethodni dan</button>
-  <span id="datumTekst" style="font-weight:bold; margin: 0 10px;"></span>
-  <button id="btnSledeci">Sledeći dan</button>
-</div>
-
 <form id="formaTermin">
+  <label for="datum">Datum:</label>
+  <input type="date" id="datum" required />
+
   <label for="termin">Izaberi termin:</label>
-  <select id="termin"></select>
+  <select id="termin" required></select>
 
   <label for="sifraStana">Šifra stana:</label>
   <input type="text" id="sifraStana" required />
@@ -44,21 +38,8 @@
   <button type="submit">Sačuvaj termin</button>
 </form>
 
-<h2>Zakazani termini za izabrani dan</h2>
-<table id="tabelaTermina">
-  <thead>
-    <tr><th>Termin</th><th>Šifra stana</th><th>Agent</th><th>Adresa</th><th>Telefon</th><th>Slikano</th></tr>
-  </thead>
-  <tbody></tbody>
-</table>
-
 <script>
-  // Pomoćna funkcija za format datuma (dd.mm.yyyy)
-  function formatDatum(date) {
-    return date.toLocaleDateString('sr-RS');
-  }
-
-  // Kreiraj liste termina od 9:00 do 19:30 u 30min koracima
+  // Popuni termine od 09:00 do 19:30 u 30 min koracima
   function napraviTermine() {
     const termini = [];
     const start = new Date();
@@ -67,27 +48,28 @@
     end.setHours(19,30,0,0);
     let trenutni = new Date(start);
     while (trenutni <= end) {
-      let h = trenutni.getHours().toString().padStart(2,'0');
-      let m = trenutni.getMinutes().toString().padStart(2,'0');
+      const h = trenutni.getHours().toString().padStart(2,'0');
+      const m = trenutni.getMinutes().toString().padStart(2,'0');
       termini.push(`${h}:${m}`);
       trenutni.setMinutes(trenutni.getMinutes() + 30);
     }
     return termini;
   }
 
-  // Inicijalizacija
-  let izabraniDatum = new Date();
-
-  const datumTekstEl = document.getElementById('datumTekst');
-  const btnPrethodni = document.getElementById('btnPrethodni');
-  const btnSledeci = document.getElementById('btnSledeci');
   const selectTermin = document.getElementById('termin');
-  const forma = document.getElementById('formaTermin');
-  const tabelaBody = document.querySelector('#tabelaTermina tbody');
+  const datumInput = document.getElementById('datum');
+
+  // Postavi danasnji datum kao default u input type=date
+  function setujDanasnjiDatum() {
+    const danas = new Date();
+    const yyyy = danas.getFullYear();
+    const mm = (danas.getMonth()+1).toString().padStart(2,'0');
+    const dd = danas.getDate().toString().padStart(2,'0');
+    datumInput.value = `${yyyy}-${mm}-${dd}`;
+  }
 
   // Popuni dropdown sa terminima
   function popuniTermine() {
-    selectTermin.innerHTML = '';
     const termini = napraviTermine();
     termini.forEach(t => {
       const option = document.createElement('option');
@@ -97,44 +79,28 @@
     });
   }
 
-  // Prikazi datum
-  function prikaziDatum() {
-    datumTekstEl.textContent = formatDatum(izabraniDatum);
-  }
+  // Funkcija za slanje podataka u Google Apps Script Web App
+  async function posaljiTermin(terminData) {
+    const url = 'https://script.google.com/macros/s/AKfycbwGT7RoHLhEZ1VRgecAN-gBu5WNuJA9hpzKuB5q4W0GWc3bkt2Fw3-7qc7oP4SP-TvNXQ/exec';
 
-  // Ucitaj termine za datum iz baze (ovde simulirano sa localStorage)
-  function ucitajTermine() {
-    tabelaBody.innerHTML = '';
-    const kljuc = 'termini_' + izabraniDatum.toISOString().slice(0,10);
-    const podaci = JSON.parse(localStorage.getItem(kljuc)) || [];
-
-    podaci.forEach(term => {
-      const red = document.createElement('tr');
-      red.innerHTML = `
-        <td>${term.termin}</td>
-        <td>${term.sifraStana}</td>
-        <td>${term.agent}</td>
-        <td>${term.adresa}</td>
-        <td>${term.telefon}</td>
-        <td>${term.slikano ? 'Da' : 'Ne'}</td>
-      `;
-      tabelaBody.appendChild(red);
+    const response = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify(terminData),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
+
+    const result = await response.json();
+    return result;
   }
 
-  // Sacuvaj termin u localStorage (ovde bi isla logika za backend)
-  function sacuvajTermin(term) {
-    const kljuc = 'termini_' + izabraniDatum.toISOString().slice(0,10);
-    const podaci = JSON.parse(localStorage.getItem(kljuc)) || [];
-    podaci.push(term);
-    localStorage.setItem(kljuc, JSON.stringify(podaci));
-  }
-
-  // Dodaj event za formu
-  forma.addEventListener('submit', e => {
+  const forma = document.getElementById('formaTermin');
+  forma.addEventListener('submit', async e => {
     e.preventDefault();
 
-    const term = {
+    const terminData = {
+      datum: datumInput.value,
       termin: selectTermin.value,
       sifraStana: document.getElementById('sifraStana').value.trim(),
       agent: document.getElementById('agent').value.trim(),
@@ -143,29 +109,23 @@
       slikano: document.getElementById('slikano').checked
     };
 
-    sacuvajTermin(term);
-    ucitajTermine();
-
-    forma.reset();
+    try {
+      const rezultat = await posaljiTermin(terminData);
+      if (rezultat.status === 'success') {
+        alert('Termin uspešno dodat!');
+        forma.reset();
+        setujDanasnjiDatum();
+      } else {
+        alert('Greška: ' + rezultat.message);
+      }
+    } catch (err) {
+      alert('Greška u komunikaciji: ' + err.message);
+    }
   });
 
-  btnPrethodni.addEventListener('click', () => {
-    izabraniDatum.setDate(izabraniDatum.getDate() - 1);
-    prikaziDatum();
-    ucitajTermine();
-  });
-
-  btnSledeci.addEventListener('click', () => {
-    izabraniDatum.setDate(izabraniDatum.getDate() + 1);
-    prikaziDatum();
-    ucitajTermine();
-  });
-
-  // Inicijalizacija stranice
+  // Init
   popuniTermine();
-  prikaziDatum();
-  ucitajTermine();
-
+  setujDanasnjiDatum();
 </script>
 
 </body>
