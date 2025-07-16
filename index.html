@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Zakazivanje Slikanja</title>
   <style>
+    /* Tvoj stil ostaje isti kao pre, radi u redu */
     body {
       font-family: Arial, sans-serif;
       background: #eef1f5;
@@ -120,7 +121,7 @@
   </div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyqUmpU8D_d6y2fs6g6st0ZphdjBIyaGSbVu483wNSpCi1N9eWUfXcEcyMsnDiYhF-Kjg/exec";
+    const SCRIPT_URL = "TVOJ_DEPLOYANI_GOOGLE_APPS_SCRIPT_URL";
 
     const startHour = 9;
     const endHour = 19;
@@ -129,14 +130,13 @@
     let savedData = {};
     let datumKey = getTodayInSerbia();
 
-    function getTodayInSerbia() {
-      const now = new Date();
-      const offset = 2 * 60; // UTC+2h Srbija
-      const local = new Date(now.getTime() + (now.getTimezoneOffset() + offset) * 60000);
-      const yyyy = local.getFullYear();
-      const mm = String(local.getMonth() + 1).padStart(2, '0');
-      const dd = String(local.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
+    // Debounce funkcija
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
     }
 
     async function fetchData(dateStr) {
@@ -156,13 +156,16 @@
         });
         renderSchedule(dateStr);
         popuniDropdown();
+        return true;
       } catch (e) {
         console.error(e);
         document.getElementById("daySchedule").innerHTML = "<h2>Greška pri učitavanju podataka</h2>";
+        return false;
       }
     }
 
-    async function saveSlot(dateStr, timeStr, slotData) {
+    // Save funkcija (poziva se preko debounce)
+    function saveSlotImmediate(dateStr, timeStr, slotData) {
       const params = new URLSearchParams({
         action: "update",
         datum: dateStr,
@@ -174,28 +177,29 @@
         slikano: slotData.slikano ? 'true' : 'false'
       });
 
-      try {
-        const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-        const result = await response.json();
-        if (result.status !== "success") {
-          console.error("Greška pri čuvanju:", result.message || result);
-        }
-      } catch (e) {
-        console.error("Greška pri čuvanju:", e);
-      }
+      console.log('Šaljem update za', dateStr, timeStr, slotData);
+
+      fetch(`${SCRIPT_URL}?${params.toString()}`)
+        .then(res => res.json())
+        .then(result => {
+          if (result.status !== "success") {
+            console.error("Greška pri čuvanju:", result.message || result);
+          }
+        })
+        .catch(e => console.error("Greška pri čuvanju:", e));
     }
 
-    function debounce(func, wait) {
-      let timeout;
-      return function(...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-      };
-    }
+    const debouncedSave = debounce(saveSlotImmediate, 500);
 
-    const debouncedSave = debounce((dateStr, timeStr, slotData) => {
-      saveSlot(dateStr, timeStr, slotData);
-    }, 500);
+    function getTodayInSerbia() {
+      const now = new Date();
+      const offset = 2 * 60; // UTC+2h Srbija
+      const local = new Date(now.getTime() + (now.getTimezoneOffset() + offset) * 60000);
+      const yyyy = local.getFullYear();
+      const mm = String(local.getMonth() + 1).padStart(2, '0');
+      const dd = String(local.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
 
     function pad(n) {
       return n.toString().padStart(2, '0');
@@ -264,7 +268,7 @@
           slikanoLabel.appendChild(document.createTextNode("Slikano"));
           slotDiv.appendChild(slikanoLabel);
 
-          // Save function on input changes
+          // Save on input changes
           function onInputChange() {
             savedData[dateStr] = savedData[dateStr] || {};
             savedData[dateStr][timeStr] = {
