@@ -223,7 +223,7 @@
             });
 
             // Koristimo fetch ne ide zbog CORS, koristimo JSONP funkciju:
-            const url = `${SCRIPT_URL}?${params.toString()}`;
+            const url = `${https://script.google.com/macros/s/AKfycbwvhs_GugyaKR0-HBug31gSEvMS3NGEek3Ky0rg3VQ2OnzMy9oCJKoUlfzS29OcfR_iMQ/exec}?${params.toString()}`;
             jsonp(url)
               .then(resp => {
                 if(resp.status === 'success') {
