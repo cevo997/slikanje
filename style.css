@@ -1,18 +1,20 @@
-
 body {
   font-family: Arial, sans-serif;
   background: #eef1f5;
   margin: 0;
   padding: 20px;
 }
+
 h1 {
   text-align: center;
   color: #333;
 }
+
 .selector {
   text-align: center;
   margin-bottom: 15px;
 }
+
 #pretragaSifre {
   width: 200px;
   padding: 8px;
@@ -25,6 +27,7 @@ h1 {
   margin-left: auto;
   margin-right: auto;
 }
+
 .day {
   background: #fff;
   border-radius: 8px;
@@ -33,11 +36,13 @@ h1 {
   max-width: 1200px;
   margin: 0 auto;
 }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 15px;
 }
+
 .time-slot {
   border: 1px solid #ccc;
   padding: 10px;
@@ -46,16 +51,19 @@ h1 {
   transition: background 0.3s ease;
   position: relative;
 }
+
 .time-slot.filled {
   background: #d0f0d0;
   opacity: 0.85;
 }
+
 .time-slot h4 {
   margin: 0 0 5px 0;
   font-size: 14px;
   color: #222;
   text-align: center;
 }
+
 .time-slot input[type="text"],
 .time-slot input[type="tel"] {
   width: 100%;
@@ -67,6 +75,7 @@ h1 {
   text-align: center;
   box-sizing: border-box;
 }
+
 .slikano-label {
   position: absolute;
   top: 10px;
@@ -74,6 +83,7 @@ h1 {
   font-size: 13px;
   color: #333;
 }
+
 .slikano-label input {
   margin-right: 5px;
 }
