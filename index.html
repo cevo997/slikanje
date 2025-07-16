@@ -27,14 +27,8 @@
   input[type="text"],
   input[type="tel"],
   input[type="date"],
-  input[type="time"],
-  input[type="checkbox"] {
-    margin-top: 6px;
-  }
-  input[type="text"],
-  input[type="tel"],
-  input[type="date"],
   input[type="time"] {
+    margin-top: 6px;
     width: 100%;
     padding: 8px 10px;
     font-size: 16px;
@@ -99,7 +93,7 @@
     id="vreme"
     min="09:00"
     max="19:30"
-    step="900" 
+    step="900"
     required
   />
 
@@ -136,8 +130,8 @@
 <script>
   const datumInput = document.getElementById('datum');
   const vremeInput = document.getElementById('vreme');
+  const forma = document.getElementById('formaTermin');
 
-  // Postavi danasnji datum kao default
   function setujDanasnjiDatum() {
     const danas = new Date();
     const yyyy = danas.getFullYear();
@@ -146,25 +140,23 @@
     datumInput.value = `${yyyy}-${mm}-${dd}`;
   }
 
-  async function posaljiTermin(terminData) {
-    const url = 'https://script.google.com/macros/s/AKfycbwGT7RoHLhEZ1VRgecAN-gBu5WNuJA9hpzKuB5q4W0GWc3bkt2Fw3-7qc7oP4SP-TvNXQ/exec';
+  function posaljiTerminJsonp(terminData, callback) {
+    const baseUrl = 'https://script.google.com/macros/s/AKfycbzfLfS-mJ5xtbp9NeRmETc9MlMyW7Mt99xiujfUJuWcwudmj1iqcsLavPeoZIs44c6qKw/exec';
+    const params = new URLSearchParams(terminData);
+    params.append('callback', 'callbackFunkcija');
 
-    const formBody = Object.entries(terminData)
-      .map(([key, val]) => encodeURIComponent(key) + '=' + encodeURIComponent(val))
-      .join('&');
+    const script = document.createElement('script');
+    script.src = baseUrl + '?' + params.toString();
+    document.body.appendChild(script);
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-      body: formBody
-    });
-
-    const result = await response.json();
-    return result;
+    window.callbackFunkcija = function(response) {
+      callback(response);
+      document.body.removeChild(script);
+      delete window.callbackFunkcija;
+    };
   }
 
-  const forma = document.getElementById('formaTermin');
-  forma.addEventListener('submit', async e => {
+  forma.addEventListener('submit', e => {
     e.preventDefault();
 
     const terminData = {
@@ -177,21 +169,17 @@
       slikano: document.getElementById('slikano').checked.toString()
     };
 
-    try {
-      const rezultat = await posaljiTermin(terminData);
+    posaljiTerminJsonp(terminData, (rezultat) => {
       if (rezultat.status === 'success') {
         alert('Termin uspešno dodat!');
         forma.reset();
         setujDanasnjiDatum();
       } else {
-        alert('Greška: ' + rezultat.message);
+        alert('Greška: ' + (rezultat.message || 'Nepoznata'));
       }
-    } catch (err) {
-      alert('Greška u komunikaciji: ' + err.message);
-    }
+    });
   });
 
-  // Inicijalizacija
   setujDanasnjiDatum();
 </script>
 
