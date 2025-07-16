@@ -2,185 +2,249 @@
 <html lang="sr">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Zakazivanje Slikanja</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #eef1f5;
+      margin: 0;
       padding: 20px;
     }
     h1 {
       text-align: center;
+      color: #333;
     }
     .selector {
       text-align: center;
       margin-bottom: 15px;
     }
-    #pretragaSifre {
-      display: block;
-      margin: 0 auto 15px auto;
-      padding: 8px;
-      font-size: 14px;
-      width: 200px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 15px;
       max-width: 1200px;
-      margin: auto;
+      margin: 0 auto;
     }
-    .slot {
+    .time-slot {
       background: #fff;
-      border: 1px solid #ccc;
-      padding: 10px;
-      border-radius: 6px;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      position: relative;
+      border: 2px solid transparent;
+      transition: border-color 0.3s;
     }
-    .slot.filled {
-      background: #dff0d8;
+    .time-slot.filled {
+      border-color: #4CAF50;
+      background: #e8f5e9;
     }
-    .slot h4 {
+    .time-slot h4 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
       text-align: center;
-      margin-top: 0;
+      color: #222;
     }
-    .slot input {
+    .time-slot input[type="text"],
+    .time-slot input[type="tel"] {
       width: 100%;
-      padding: 5px;
-      margin-bottom: 5px;
+      padding: 6px;
+      margin-bottom: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
       box-sizing: border-box;
+      text-align: center;
     }
-    .checkbox {
-      display: flex;
-      align-items: center;
-      gap: 5px;
+    .slikano-label {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 14px;
+      color: #333;
+      user-select: none;
+    }
+    .slikano-label input {
+      margin-right: 5px;
+      transform: scale(1.2);
     }
   </style>
 </head>
 <body>
+
   <h1>Zakazivanje Slikanja</h1>
-  <input id="pretragaSifre" type="text" placeholder="Pretraga po šifri" oninput="pretraziSifru()" />
+
   <div class="selector">
-    <label for="datum">Izaberi datum:</label>
-    <input type="date" id="datum" onchange="prikaziTermine()">
+    <label for="datumSelect">Izaberi datum: </label>
+    <input type="date" id="datumSelect" />
   </div>
-  <div class="grid" id="terminiGrid"></div>
 
-  <script>
-    const SHEET_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLgoUOahSLvetiMiKxtOIDBL7mgTOBFiw6yUic9bcxqnN3ILyyB9iFHHgXiP9sm52RVtr4E-GxN9RAEjJJD03lbYDj-UYTH4ofslij2uXF8O3eprQqapoaypDJ-etCVOn8hk0VVKPOJFgeJFSUHmgGloaEiB_l-c987-2KMLUB2H6_0WOAfQGhP1t8hJDuME4dG_E5XaUWRtaqltKJZsOWRFWJVEnFQNP1nNCRap8U84jxZo88eSDeZzMi8NpaSydWem8bnqtfHBvJSYBhThFlEtgr-mWelNBGsqwzxA&lib=MIPm2ju-ijGXWi5xgI7G-NI5etRJWauVd";
+  <div id="schedule" class="grid">Učitavanje termina...</div>
 
-    const startTime = 9;
-    const endTime = 19;
-    const interval = 30;
+<script>
+  const SCRIPT_URL = 'TVOJ_DEPLOY_URL_OD_APPS_SCRIPT'; // OVDE ZAMENI SA TVOJIM URL
 
-    function danasnjiDatum() {
-      const d = new Date();
-      const offset = d.getTimezoneOffset() / -60;
-      d.setHours(d.getHours() + offset);
-      return d.toISOString().split("T")[0];
-    }
+  const startHour = 9;
+  const endHour = 19;
+  const interval = 30; // minuta
 
-    document.getElementById("datum").value = danasnjiDatum();
+  // Inicijalni datum - danas u Srbiji (UTC+2)
+  function getTodaySerbiaISO() {
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const serbiaTime = new Date(utc + (2 * 3600000));
+    return serbiaTime.toISOString().slice(0,10);
+  }
 
-    function generisiTermine() {
-      const termini = [];
-      for (let h = startTime; h <= endTime; h++) {
-        for (let m = 0; m < 60; m += interval) {
-          termini.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  const datumInput = document.getElementById('datumSelect');
+  const scheduleDiv = document.getElementById('schedule');
+
+  datumInput.value = getTodaySerbiaISO();
+
+  datumInput.addEventListener('change', () => {
+    loadSchedule(datumInput.value);
+  });
+
+  // JSONP helper
+  function jsonp(url, callbackName) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      const name = 'jsonp_callback_' + Math.round(100000 * Math.random());
+
+      window[name] = function(data) {
+        delete window[name];
+        document.body.removeChild(script);
+        resolve(data);
+      };
+
+      script.src = `${url}&callback=${name}`;
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  }
+
+  function loadSchedule(datum) {
+    scheduleDiv.innerHTML = 'Učitavanje termina...';
+
+    const url = `${SCRIPT_URL}?action=getByDate&datum=${datum}`;
+    jsonp(url)
+      .then(response => {
+        if(response.status === 'success') {
+          renderSchedule(datum, response.data);
+        } else {
+          scheduleDiv.innerHTML = 'Greška pri učitavanju termina.';
         }
-      }
-      return termini;
-    }
+      })
+      .catch(() => {
+        scheduleDiv.innerHTML = 'Greška pri komunikaciji sa serverom.';
+      });
+  }
 
-    function prikaziTermine() {
-      const grid = document.getElementById("terminiGrid");
-      grid.innerHTML = "";
-      const datum = document.getElementById("datum").value;
-      const termini = generisiTermine();
+  function renderSchedule(datum, termini) {
+    scheduleDiv.innerHTML = '';
 
-      termini.forEach(vreme => {
-        const slot = document.createElement("div");
-        slot.className = "slot";
-        const h4 = document.createElement("h4");
-        h4.textContent = vreme;
-        slot.appendChild(h4);
+    // Kreiramo mapu za lakše pronalaženje termina po vremenu i šifri
+    const terminiMap = {};
+    termini.forEach(t => {
+      terminiMap[t.termin + '_' + t.sifraStana] = t;
+    });
 
-        const sifra = napraviInput("Šifra stana");
-        const agent = napraviInput("Agent");
-        const adresa = napraviInput("Adresa");
-        const telefon = napraviInput("Telefon");
+    for(let h = startHour; h <= endHour; h++) {
+      for(let m = 0; m < 60; m += interval) {
+        const pad = n => n.toString().padStart(2, '0');
+        const vreme = `${pad(h)}:${pad(m)}`;
 
-        const checkDiv = document.createElement("div");
-        checkDiv.className = "checkbox";
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        const label = document.createElement("label");
-        label.textContent = "Slikano";
-        checkDiv.appendChild(checkbox);
-        checkDiv.appendChild(label);
+        // Tražimo da li postoji termin za ovo vreme
+        // Ako nema ni jednog sa tom šifrom, prikažemo prazno polje
+        // Ali da bismo olakšali, prikažemo prazno polje sa praznim vrednostima
 
-        slot.appendChild(sifra);
-        slot.appendChild(agent);
-        slot.appendChild(adresa);
-        slot.appendChild(telefon);
-        slot.appendChild(checkDiv);
+        // U ovom primeru prikazujemo samo po vremenu, po šifri stana termin unosimo direktno ručno
+        // Dakle, prazno polje
 
-        [sifra, agent, adresa, telefon, checkbox].forEach(el => {
-          el.addEventListener("input", () => {
-            if (sifra.value.trim() !== "") slot.classList.add("filled");
-            sacuvajTermin(datum, vreme, sifra.value, agent.value, adresa.value, telefon.value, checkbox.checked);
+        // Ako ima termin sa nekom sifrom za ovo vreme, možemo ih prikazati ili pustiti korisnika da upiše novu
+
+        // Za prost primer prikaza jedan termin po vremenu
+
+        // Provera ako je termin zauzet - na osnovu prvog termina koji nađemo na to vreme
+        const keyPrefix = vreme + '_'; // po sifri nema filtriranja
+        let existingTermin = termini.find(t => t.termin === vreme);
+
+        const slotData = existingTermin || {
+          sifraStana: '',
+          agent: '',
+          adresa: '',
+          telefon: '',
+          slikano: 'Ne'
+        };
+
+        const div = document.createElement('div');
+        div.className = 'time-slot';
+        if(slotData.sifraStana) {
+          div.classList.add('filled');
+        }
+
+        div.innerHTML = `
+          <h4>${vreme}</h4>
+          <input type="text" placeholder="Šifra stana" value="${slotData.sifraStana}" />
+          <input type="text" placeholder="Agent" value="${slotData.agent}" />
+          <input type="text" placeholder="Adresa" value="${slotData.adresa}" />
+          <input type="tel" placeholder="Telefon" value="${slotData.telefon}" />
+          <label class="slikano-label">
+            <input type="checkbox" ${slotData.slikano === 'Da' ? 'checked' : ''} />
+            Slikano
+          </label>
+        `;
+
+        // Dodaj event listener za čuvanje podataka na promenu
+        const inputs = div.querySelectorAll('input');
+        inputs.forEach(input => {
+          input.addEventListener('change', () => {
+            const sifra = div.querySelector('input[placeholder="Šifra stana"]').value.trim();
+            const agent = div.querySelector('input[placeholder="Agent"]').value.trim();
+            const adresa = div.querySelector('input[placeholder="Adresa"]').value.trim();
+            const telefon = div.querySelector('input[placeholder="Telefon"]').value.trim();
+            const slikano = div.querySelector('input[type="checkbox"]').checked;
+
+            if(!sifra) {
+              alert('Unesite šifru stana pre čuvanja!');
+              return;
+            }
+
+            // Salji update preko JSONP poziva na Apps Script
+            const params = new URLSearchParams({
+              action: 'update',
+              datum,
+              termin: vreme,
+              sifraStana: sifra,
+              agent,
+              adresa,
+              telefon,
+              slikano: slikano ? 'Da' : 'Ne'
+            });
+
+            // Koristimo fetch ne ide zbog CORS, koristimo JSONP funkciju:
+            const url = `${SCRIPT_URL}?${params.toString()}`;
+            jsonp(url)
+              .then(resp => {
+                if(resp.status === 'success') {
+                  div.classList.toggle('filled', sifra.length > 0);
+                } else {
+                  alert('Greška pri čuvanju: ' + resp.message);
+                }
+              })
+              .catch(() => {
+                alert('Greška pri komunikaciji sa serverom.');
+              });
           });
         });
 
-        slot.dataset.sifra = sifra.value;
-        grid.appendChild(slot);
-      });
+        scheduleDiv.appendChild(div);
+      }
     }
+  }
 
-    function napraviInput(placeholder) {
-      const input = document.createElement("input");
-      input.placeholder = placeholder;
-      return input;
-    }
+  loadSchedule(datumInput.value);
+</script>
 
-    function sacuvajTermin(datum, vreme, sifra, agent, adresa, telefon, slikano) {
-      const params = new URLSearchParams({
-        datum,
-        termin: vreme,
-        sifraStana: sifra,
-        agent,
-        adresa,
-        telefon,
-        slikano: slikano.toString(),
-        callback: "callbackFunkcija"
-      });
-
-      const script = document.createElement("script");
-      script.src = SHEET_URL + "?" + params.toString();
-      document.body.appendChild(script);
-
-      window.callbackFunkcija = function(res) {
-        console.log("Sačuvano:", res);
-        document.body.removeChild(script);
-        delete window.callbackFunkcija;
-      };
-    }
-
-    function pretraziSifru() {
-      const query = document.getElementById("pretragaSifre").value.trim().toLowerCase();
-      const sviSlotovi = document.querySelectorAll(".slot");
-      sviSlotovi.forEach(slot => {
-        const sifraInput = slot.querySelector("input[placeholder='Šifra stana']");
-        const val = sifraInput.value.trim().toLowerCase();
-        slot.style.display = val.includes(query) ? "block" : "none";
-      });
-    }
-
-    prikaziTermine();
-  </script>
 </body>
 </html>
-
-
