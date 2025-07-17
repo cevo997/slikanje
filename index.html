@@ -1,86 +1,229 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Zakazivanje slikanja</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    input, select, button { margin: 5px; padding: 5px; }
-    .termin { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zakazivanje Slikanja</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #eef1f5;
+    padding: 20px;
+    margin: 0;
+  }
+  h1 {
+    text-align: center;
+    color: #333;
+  }
+  #izborDatuma {
+    display: block;
+    margin: 10px auto 20px auto;
+    padding: 8px;
+    font-size: 16px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    max-width: 200px;
+  }
+  #daySchedule {
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(280px,1fr));
+    gap: 15px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  .time-slot {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    padding: 15px;
+    border: 1px solid #ccc;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .time-slot.filled {
+    background: #d0f7d0;
+  }
+  .time-slot h3 {
+    margin: 0 0 10px 0;
+    font-weight: 700;
+    color: #222;
+    text-align: center;
+  }
+  .time-slot input[type="text"],
+  .time-slot input[type="tel"] {
+    padding: 8px;
+    margin: 5px 0;
+    border-radius: 5px;
+    border: 1px solid #bbb;
+    font-size: 14px;
+  }
+  label.slikano-label {
+    margin: 8px 0;
+    font-size: 13px;
+    color: #333;
+    display: flex;
+    align-items: center;
+  }
+  label.slikano-label input {
+    margin-right: 6px;
+  }
+  button.save-btn {
+    margin-top: auto;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background-color: #1a73e8;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 15px;
+  }
+  button.save-btn:disabled {
+    background-color: #888;
+    cursor: not-allowed;
+  }
+</style>
 </head>
 <body>
-  <h1>Zakazivanje slikanja</h1>
 
-  <div>
-    <input type="date" id="datum" />
-    <select id="vreme">
-      <option value="">Izaberi vreme</option>
-      <script>
-        for (let h = 9; h <= 19; h++) {
-          ["00", "30"].forEach(m => {
-            const v = (h < 10 ? "0" : "") + h + ":" + m;
-            document.write(`<option value="${v}">${v}</option>`);
-          });
-        }
-      </script>
-    </select>
-    <input type="text" id="sifra" placeholder="Šifra stana" />
-    <input type="text" id="agent" placeholder="Agent" />
-    <input type="text" id="adresa" placeholder="Adresa" />
-    <input type="text" id="telefon" placeholder="Telefon" />
-    <label><input type="checkbox" id="slikano" /> Slikano</label>
-    <button onclick="sacuvaj()">Sačuvaj</button>
+  <h1>Zakazivanje Slikanja</h1>
+
+  <input type="date" id="izborDatuma" />
+
+  <div id="daySchedule">
+    <p style="text-align:center;">Učitavanje...</p>
   </div>
 
-  <h2>Sačuvani termini:</h2>
-  <div id="listaTermina">Učitavanje...</div>
+<script>
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxFjSv8IOLKqg29HuUdbBi9Pq_6X66BAWQEcCfx_6YEIP3p_0MxcwKCPHfCAcnmF8019A/exec; // OVDE ZAMENI SA TVOJIM URL
 
-  <script>
-    const URL = "https://script.google.com/macros/s/AKfycbzdksNljB7DrO1qXsTMlybrEdbvatJg10vA8nFkrKD46bwBPpamANqpU0S9Go1qJARj9A/exec";
+  let savedData = {};
+  const izborDatumaInput = document.getElementById("izborDatuma");
 
-    function sacuvaj() {
-      const podaci = {
-        datum: document.getElementById('datum').value,
-        vreme: document.getElementById('vreme').value,
-        sifra: document.getElementById('sifra').value,
-        agent: document.getElementById('agent').value,
-        adresa: document.getElementById('adresa').value,
-        telefon: document.getElementById('telefon').value,
-        slikano: document.getElementById('slikano').checked
-      };
+  function getTodayISO() {
+    const d = new Date();
+    return d.toISOString().slice(0,10);
+  }
 
-      fetch(URL, {
-        method: "POST",
-        body: JSON.stringify(podaci)
-      }).then(() => {
-        alert("Sačuvano!");
-        ucitajTermine();
+  // Postavi danasnji datum kao default
+  let datumKey = getTodayISO();
+  izborDatumaInput.value = datumKey;
+
+  izborDatumaInput.addEventListener("change", () => {
+    datumKey = izborDatumaInput.value;
+    fetchData(datumKey);
+  });
+
+  async function fetchData(datum) {
+    const container = document.getElementById("daySchedule");
+    container.innerHTML = "<p style='text-align:center;'>Učitavanje...</p>";
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getByDate&datum=${datum}`);
+      if (!res.ok) throw new Error("Network error");
+      const data = await res.json();
+
+      savedData = {};
+      data.forEach(item => {
+        savedData[item.Termin] = item;
       });
+      renderSchedule();
+    } catch(e) {
+      container.innerHTML = `<p style="color:red; text-align:center;">Greška pri učitavanju podataka.</p>`;
+      console.error(e);
     }
+  }
 
-    function ucitajTermine() {
-      fetch(URL)
-        .then(res => res.json())
-        .then(podaci => {
-          const div = document.getElementById("listaTermina");
-          if (podaci.length === 0) {
-            div.innerHTML = "Nema unetih termina.";
-            return;
+  function renderSchedule() {
+    const container = document.getElementById("daySchedule");
+    container.innerHTML = "";
+    const times = generateTimes("09:00", "19:00", 30);
+
+    times.forEach(timeStr => {
+      const slot = savedData[timeStr] || { SifraStana: "", Agent: "", Adresa: "", Telefon: "", Slikano: false };
+
+      const slotDiv = document.createElement("div");
+      slotDiv.className = "time-slot";
+      if (slot.SifraStana || slot.Agent || slot.Adresa || slot.Telefon) slotDiv.classList.add("filled");
+
+      slotDiv.innerHTML = `
+        <h3>${timeStr}</h3>
+        <input type="text" placeholder="Šifra stana" value="${slot.SifraStana || ''}" class="sifra" />
+        <input type="text" placeholder="Agent" value="${slot.Agent || ''}" class="agent" />
+        <input type="text" placeholder="Adresa" value="${slot.Adresa || ''}" class="adresa" />
+        <input type="tel" placeholder="Telefon" value="${slot.Telefon || ''}" class="telefon" />
+        <label class="slikano-label">
+          <input type="checkbox" class="slikano" ${slot.Slikano ? "checked" : ""} /> Slikano
+        </label>
+        <button class="save-btn">Sačuvaj</button>
+      `;
+
+      slotDiv.querySelector(".save-btn").addEventListener("click", async () => {
+        const novaVrednost = {
+          sifraStana: slotDiv.querySelector(".sifra").value.trim(),
+          agent: slotDiv.querySelector(".agent").value.trim(),
+          adresa: slotDiv.querySelector(".adresa").value.trim(),
+          telefon: slotDiv.querySelector(".telefon").value.trim(),
+          slikano: slotDiv.querySelector(".slikano").checked
+        };
+
+        const btn = slotDiv.querySelector(".save-btn");
+        btn.disabled = true;
+        btn.textContent = "Čuvanje...";
+
+        try {
+          const params = new URLSearchParams({
+            action: "update",
+            datum: datumKey,
+            termin: timeStr,
+            sifraStana: novaVrednost.sifraStana,
+            agent: novaVrednost.agent,
+            adresa: novaVrednost.adresa,
+            telefon: novaVrednost.telefon,
+            slikano: novaVrednost.slikano ? "true" : "false"
+          });
+          const res = await fetch(`${SCRIPT_URL}?${params.toString()}`);
+          const result = await res.json();
+
+          if (result.status === "success") {
+            savedData[timeStr] = { ...novaVrednost };
+            slotDiv.classList.add("filled");
+            btn.textContent = "Sačuvano ✔";
+          } else {
+            alert("Greška pri čuvanju: " + (result.message || "Nepoznata greška"));
+            btn.textContent = "Sačuvaj";
           }
-          div.innerHTML = podaci.map(red => `
-            <div class="termin">
-              <strong>${red[0]} ${red[1]}</strong><br/>
-              Šifra: ${red[2]} | Agent: ${red[3]}<br/>
-              Adresa: ${red[4]}<br/>
-              Tel: ${red[5]}<br/>
-              Slikano: ${red[6]}
-            </div>
-          `).join('');
-        });
-    }
+        } catch (err) {
+          alert("Greška pri čuvanju podataka.");
+          btn.textContent = "Sačuvaj";
+        }
+        btn.disabled = false;
+      });
 
-    window.onload = ucitajTermine;
-  </script>
+      container.appendChild(slotDiv);
+    });
+  }
+
+  function generateTimes(start, end, intervalMinutes) {
+    const times = [];
+    let [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+
+    while (sh < eh || (sh === eh && sm <= em)) {
+      times.push(`${String(sh).padStart(2,"0")}:${String(sm).padStart(2,"0")}`);
+      sm += intervalMinutes;
+      if (sm >= 60) {
+        sm -= 60;
+        sh++;
+      }
+    }
+    return times;
+  }
+
+  fetchData(datumKey);
+
+</script>
+
 </body>
 </html>
