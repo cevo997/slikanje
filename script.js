@@ -1,73 +1,71 @@
+
+Stefan Barać <stefanbarac@gmail.com>
+17:35 (пре 0 минута)
+коме ја
+
 const API_URL = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
 const agenti = ["SAŠKA", "CECA", "LJILJA", "RUŽA", "SEKA", "SANDRA", "NIKOLA", "ANĐELA", "ATINA", "VIŠNJA", "MILA", "BUDA", "NATAŠA"];
-const vremeTermina = [
-  "09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00",
-  "13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30",
-  "18:00","18:30","19:00","19:30"
-];
+const vremeTermina = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30"];
+let podaci = [];
 
 document.addEventListener("DOMContentLoaded", () => {
   const izborDatuma = document.getElementById("izborDatuma");
-  // postavi današnji datum kao podrazumevani
-  izborDatuma.value = new Date().toISOString().split("T")[0];
-
-  izborDatuma.addEventListener("change", () => {
-    prikaziTermine(izborDatuma.value);
-  });
-
-  prikaziTermine(izborDatuma.value);
+  izborDatuma.value = new Date().toISOString().split("T")[0]; // danasnji datum
+  izborDatuma.addEventListener("change", prikaziTermine);
+  prikaziTermine();
 });
 
-function prikaziTermine(datum) {
+function prikaziTermine() {
+  const datum = document.getElementById("izborDatuma").value;
   fetch(`${API_URL}?Datum=${datum}`)
     .then(res => {
-      if (!res.ok) throw new Error("Greška pri dohvaćanju podataka");
+      if (!res.ok) throw new Error("Neuspesan odgovor sa servera");
       return res.json();
     })
     .then(data => {
+      podaci = data;
       const container = document.getElementById("termini");
       container.innerHTML = "";
 
       vremeTermina.forEach(vreme => {
-        const entry = data.find(d => d.Vreme === vreme);
-
+        const entry = podaci.find(t => t.Vreme === vreme);
         const div = document.createElement("div");
         div.className = "termin";
-
-        if (entry && entry.Slikano === "TRUE") div.classList.add("zavrseno");
+        if (entry?.Slikano === "TRUE") div.classList.add("zavrseno");
 
         div.innerHTML = `
-          <div><strong>Datum:</strong> ${datum}</div>
-          <div><strong>Termin:</strong> ${vreme}</div>
-          <label>Šifra stana</label><input type="text" value="${entry ? entry["Šifra stana"] : ""}" />
-          <label>Adresa</label><input type="text" value="${entry ? entry.Adresa : ""}" />
-          <label>Telefon</label><input type="text" value="${entry ? entry.Telefon : ""}" />
+          <div><b>Datum:</b> ${datum}</div>
+          <div><b>Vreme:</b> ${vreme}</div>
+          <label>Šifra stana</label>
+          <input type="text" value="${entry?.["Šifra stana"] || ""}" />
+          <label>Adresa</label>
+          <input type="text" value="${entry?.Adresa || ""}" />
+          <label>Telefon</label>
+          <input type="text" value="${entry?.Telefon || ""}" />
           <label>Agent</label>
           <select>
-            ${agenti.map(agent => `<option${entry && entry.Agent === agent ? " selected" : ""}>${agent}</option>`).join("")}
+            ${agenti.map(agent => `<option${entry?.Agent === agent ? " selected" : ""}>${agent}</option>`).join("")}
           </select>
-          <label><input type="checkbox" ${entry && entry.Slikano === "TRUE" ? "checked" : ""}/> Slikano</label>
-          <button onclick="sacuvaj(this, '${datum}', '${vreme}')">Sačuvaj</button>
+          <label><input type="checkbox" ${entry?.Slikano === "TRUE" ? "checked" : ""} /> Slikano</label>
+          <button onclick="sacuvaj(this, '${vreme}', '${datum}')">Sačuvaj</button>
         `;
-
         container.appendChild(div);
       });
     })
     .catch(err => {
-      console.error(err);
-      alert("Došlo je do greške pri učitavanju termina.");
+      alert(err.message);
     });
 }
 
-function sacuvaj(btn, datum, vreme) {
-  const kartica = btn.parentElement;
-  const sifra = kartica.querySelectorAll("input")[1].value;
-  const adresa = kartica.querySelectorAll("input")[2].value;
-  const telefon = kartica.querySelectorAll("input")[3].value;
-  const agent = kartica.querySelector("select").value;
-  const slikano = kartica.querySelector("input[type=checkbox]").checked ? "TRUE" : "";
+function sacuvaj(btn, vreme, datum) {
+  const div = btn.parentElement;
+  const sifra = div.querySelectorAll("input")[0].value;
+  const adresa = div.querySelectorAll("input")[1].value;
+  const telefon = div.querySelectorAll("input")[2].value;
+  const agent = div.querySelector("select").value;
+  const slikano = div.querySelector("input[type=checkbox]").checked ? "TRUE" : "FALSE";
 
-  const noviUnos = {
+  const novi = {
     Datum: datum,
     Vreme: vreme,
     "Šifra stana": sifra,
@@ -80,17 +78,14 @@ function sacuvaj(btn, datum, vreme) {
   fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ data: [noviUnos] })
+    body: JSON.stringify({ data: [novi] })
   })
   .then(res => {
-    if (!res.ok) throw new Error("Greška pri čuvanju");
+    if (!res.ok) throw new Error("Greška pri čuvanju podataka.");
     return res.json();
   })
   .then(() => {
-    prikaziTermine(datum);
+    prikaziTermine();
   })
-  .catch(err => {
-    console.error(err);
-    alert("Došlo je do greške pri čuvanju.");
-  });
+  .catch(err => alert(err.message));
 }
