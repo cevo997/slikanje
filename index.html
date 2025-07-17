@@ -4,152 +4,83 @@
   <meta charset="UTF-8" />
   <title>Zakazivanje slikanja</title>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-      background: #f5f5f5;
-    }
-    h1 {
-      text-align: center;
-    }
-    .selector {
-      margin-bottom: 20px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 12px;
-    }
-    .kartica {
-      background: white;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .kartica input, .kartica textarea {
-      width: 100%;
-      margin: 4px 0;
-      padding: 4px;
-    }
-    .kartica label {
-      font-weight: bold;
-      font-size: 12px;
-    }
-    .sacuvajBtn {
-      margin-top: 6px;
-      background: #4caf50;
-      color: white;
-      border: none;
-      padding: 6px 10px;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-    .sacuvajBtn:hover {
-      background: #45a049;
-    }
+    body { font-family: sans-serif; padding: 20px; }
+    input, select, button { margin: 5px; padding: 5px; }
+    .termin { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
   </style>
 </head>
 <body>
-  <h1>Zakazivanje Slikanja</h1>
-  <div class="selector">
-    <label for="izborDatuma">Izaberi datum:</label>
-    <input type="date" id="izborDatuma" onchange="promeniDatum(this.value)">
+  <h1>Zakazivanje slikanja</h1>
+
+  <div>
+    <input type="date" id="datum" />
+    <select id="vreme">
+      <option value="">Izaberi vreme</option>
+      <script>
+        for (let h = 9; h <= 19; h++) {
+          ["00", "30"].forEach(m => {
+            const v = (h < 10 ? "0" : "") + h + ":" + m;
+            document.write(`<option value="${v}">${v}</option>`);
+          });
+        }
+      </script>
+    </select>
+    <input type="text" id="sifra" placeholder="Šifra stana" />
+    <input type="text" id="agent" placeholder="Agent" />
+    <input type="text" id="adresa" placeholder="Adresa" />
+    <input type="text" id="telefon" placeholder="Telefon" />
+    <label><input type="checkbox" id="slikano" /> Slikano</label>
+    <button onclick="sacuvaj()">Sačuvaj</button>
   </div>
-  <div id="termini" class="grid"></div>
+
+  <h2>Sačuvani termini:</h2>
+  <div id="listaTermina">Učitavanje...</div>
 
   <script>
-    const terminiPoVremenu = [
-      "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-      "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-      "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-      "18:00", "18:30", "19:00", "19:30"
-    ];
+    const URL = "https://script.google.com/macros/s/AKfycbzdksNljB7DrO1qXsTMlybrEdbvatJg10vA8nFkrKD46bwBPpamANqpU0S9Go1qJARj9A/exec";
 
-    let sviTermini = [];
+    function sacuvaj() {
+      const podaci = {
+        datum: document.getElementById('datum').value,
+        vreme: document.getElementById('vreme').value,
+        sifra: document.getElementById('sifra').value,
+        agent: document.getElementById('agent').value,
+        adresa: document.getElementById('adresa').value,
+        telefon: document.getElementById('telefon').value,
+        slikano: document.getElementById('slikano').checked
+      };
 
-    function formatirajDatum(d) {
-      const date = new Date(d);
-      return date.toLocaleDateString("sr-RS", {
-        day: "2-digit", month: "2-digit", year: "numeric"
+      fetch(URL, {
+        method: "POST",
+        body: JSON.stringify(podaci)
+      }).then(() => {
+        alert("Sačuvano!");
+        ucitajTermine();
       });
     }
 
-    function promeniDatum(datum) {
-      const kontejner = document.getElementById("termini");
-      kontejner.innerHTML = "";
-      const danas = formatirajDatum(datum);
-
-      for (let vreme of terminiPoVremenu) {
-        const kartica = document.createElement("div");
-        kartica.className = "kartica";
-
-        kartica.innerHTML = `
-          <label>Vreme: ${vreme}</label><br>
-          <label>Šifra stana</label><input type="text" class="sifra"><br>
-          <label>Agent</label><input type="text" class="agent"><br>
-          <label>Adresa</label><input type="text" class="adresa"><br>
-          <label>Telefon</label><input type="text" class="telefon"><br>
-          <label>Slikano:</label><input type="checkbox" class="slikano"><br>
-          <button class="sacuvajBtn" onclick="sacuvaj(this, '${danas}', '${vreme}')">Sačuvaj</button>
-        `;
-        kontejner.appendChild(kartica);
-      }
-
-      // Povući podatke iz sheeta
-      const url = 'https://script.google.com/macros/s/AKfycbxT38AbXBtxhUsrq2Mlk-4eTIOI1yDeRIoklArbf9xScx52tryPKdaIGHwJvXih92cFGQ/exec?callback=ucitaj&datum=' + encodeURIComponent(danas);
-      const s = document.createElement('script');
-      s.src = url;
-      document.body.appendChild(s);
-    }
-
-    function ucitaj(podaci) {
-      sviTermini = podaci;
-      const kartice = document.querySelectorAll(".kartica");
-
-      for (let red of podaci) {
-        const [datum, vreme, sifra, agent, adresa, telefon, slikano] = red;
-        for (let kartica of kartice) {
-          if (kartica.innerHTML.includes(`Vreme: ${vreme}`)) {
-            kartica.querySelector(".sifra").value = sifra;
-            kartica.querySelector(".agent").value = agent;
-            kartica.querySelector(".adresa").value = adresa;
-            kartica.querySelector(".telefon").value = telefon;
-            kartica.querySelector(".slikano").checked = slikano === "Da";
+    function ucitajTermine() {
+      fetch(URL)
+        .then(res => res.json())
+        .then(podaci => {
+          const div = document.getElementById("listaTermina");
+          if (podaci.length === 0) {
+            div.innerHTML = "Nema unetih termina.";
+            return;
           }
-        }
-      }
-    }
-
-    function sacuvaj(dugme, datum, vreme) {
-      const kartica = dugme.parentElement;
-      const sifra = kartica.querySelector(".sifra").value;
-      const agent = kartica.querySelector(".agent").value;
-      const adresa = kartica.querySelector(".adresa").value;
-      const telefon = kartica.querySelector(".telefon").value;
-      const slikano = kartica.querySelector(".slikano").checked ? "Da" : "Ne";
-
-      const podaci = {
-        datum, vreme, sifra, agent, adresa, telefon, slikano
-      };
-
-      const query = Object.keys(podaci)
-        .map(k => `${k}=${encodeURIComponent(podaci[k])}`)
-        .join("&");
-
-      const url = "https://script.google.com/macros/s/AKfycbxT38AbXBtxhUsrq2Mlk-4eTIOI1yDeRIoklArbf9xScx52tryPKdaIGHwJvXih92cFGQ/exec?" + query;
-      fetch(url)
-        .then(res => {
-          if (res.ok) alert("Uspešno sačuvano!");
-          else alert("Greška pri čuvanju!");
+          div.innerHTML = podaci.map(red => `
+            <div class="termin">
+              <strong>${red[0]} ${red[1]}</strong><br/>
+              Šifra: ${red[2]} | Agent: ${red[3]}<br/>
+              Adresa: ${red[4]}<br/>
+              Tel: ${red[5]}<br/>
+              Slikano: ${red[6]}
+            </div>
+          `).join('');
         });
     }
 
-    // Automatski postavi današnji datum pri učitavanju
-    window.onload = () => {
-      const danas = new Date().toISOString().split("T")[0];
-      document.getElementById("izborDatuma").value = danas;
-      promeniDatum(danas);
-    };
+    window.onload = ucitajTermine;
   </script>
 </body>
 </html>
