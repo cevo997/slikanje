@@ -1,151 +1,176 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Zakazivanje slikanja</title>
   <style>
     body {
       font-family: sans-serif;
       padding: 20px;
+      background: #f0f0f0;
+    }
+    h1 {
+      text-align: center;
+    }
+    #datumPicker {
+      margin: 10px auto;
+      display: block;
+      font-size: 16px;
+      padding: 5px;
+    }
+    #termini {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
     }
     .kartica {
-      display: inline-block;
-      width: 220px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      margin: 5px;
-      padding: 10px;
-      background: #f9f9f9;
-      vertical-align: top;
-      transition: background 0.3s;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: background-color 0.3s;
     }
     .kartica.zatamnjeno {
-      background: #ddd;
+      background: #ccc;
     }
     label {
       display: block;
-      margin-top: 5px;
+      margin: 5px 0 2px;
     }
     input, select {
       width: 100%;
-      padding: 4px;
-      margin-top: 2px;
+      padding: 6px;
+      margin-bottom: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
     }
     button {
-      margin-top: 8px;
-      width: 100%;
-      padding: 6px;
+      padding: 6px 12px;
+      border: none;
+      background: #28a745;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
     }
-    .agent-brojac {
+    button:hover {
+      background: #218838;
+    }
+    #statistika {
       margin-top: 20px;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
   <h1>Zakazivanje slikanja</h1>
-  <div id="kartice"></div>
-  <div class="agent-brojac" id="brojaci"></div>
+  <select id="datumPicker"></select>
+  <div id="termini"></div>
+  <div id="statistika"></div>
 
   <script>
-    const API_URL = 'https://sheetdb.io/api/v1/ywvbhlm9ikdui';
-    const agenti = ["SAŠKA","CECA","LJILJA","RUŽA","SEKA","SANDRA","NIKOLA","ANĐELA","ATINA","VIŠNJA","MILA","BUDA","NATAŠA"];
-    const vremeTermina = [
-      "09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30",
-      "13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30",
-      "17:00","17:30","18:00","18:30","19:00","19:30"
-    ];
-
-    let agentBrojanja = {};
-
-    agenti.forEach(a => agentBrojanja[a] = 0);
+    const apiUrl = 'https://sheetdb.io/api/v1/ywvbhlm9ikdui';
+    const agenti = ["SAŠKA", "CECA", "LJILJA", "RUŽA", "SEKA", "SANDRA", "NIKOLA", "ANĐELA", "ATINA", "VIŠNJA", "MILA", "BUDA", "NATAŠA"];
+    const terminiVremena = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"];
 
     const danas = new Date();
-    const datumSrbija = new Date(danas.toLocaleString("en-US", {timeZone: "Europe/Belgrade"}))
-      .toISOString().split("T")[0];
+    let izabraniDatum = danas.toISOString().split('T')[0];
+
+    function napuniDatumDropdown() {
+      const picker = document.getElementById("datumPicker");
+      for(let i = 0; i < 30; i++) {
+        const d = new Date(danas);
+        d.setDate(d.getDate() + i);
+        const iso = d.toISOString().split('T')[0];
+        const opcija = document.createElement("option");
+        opcija.value = iso;
+        opcija.textContent = iso;
+        picker.appendChild(opcija);
+      }
+      picker.value = izabraniDatum;
+      picker.addEventListener("change", () => {
+        izabraniDatum = picker.value;
+        ucitajTermine();
+      });
+    }
 
     async function ucitajTermine() {
-      const res = await fetch(`${API_URL}?search=Datum&value=${datumSrbija}`);
-      const podaci = await res.json();
-      const mapa = {};
-      podaci.forEach(el => {
-        mapa[el.Vreme] = el;
-        if (el.Slikano === "on" && agenti.includes(el.Agent)) {
-          agentBrojanja[el.Agent]++;
-        }
-      });
-      crtajKartice(mapa);
-    }
+      const response = await fetch(apiUrl);
+      const podaci = await response.json();
 
-    function crtajKartice(mapa) {
-      const kont = document.getElementById("kartice");
-      kont.innerHTML = "";
+      const container = document.getElementById("termini");
+      container.innerHTML = "";
+      const brojac = {};
 
-      vremeTermina.forEach(vreme => {
-        const pod = mapa[vreme] || {};
-        const div = document.createElement("div");
-        div.className = "kartica";
-        if (pod.Slikano === "on") div.classList.add("zatamnjeno");
+      terminiVremena.forEach(vreme => {
+        const podatak = podaci.find(p => p.Datum === izabraniDatum && p.Vreme === vreme) || {};
+        const kartica = document.createElement("div");
+        kartica.className = "kartica";
+        if (podatak.Slikano === "DA") kartica.classList.add("zatamnjeno");
 
-        div.innerHTML = `
-          <h4>${vreme}</h4>
-          <label>Šifra stana: <input type="text" value="${pod['Šifra stana'] || ''}"></label>
-          <label>Agent:
-            <select>
-              <option value="">Izaberi</option>
-              ${agenti.map(ag => `<option ${pod.Agent === ag ? 'selected' : ''}>${ag}</option>`).join("")}
-            </select>
-          </label>
-          <label>Adresa: <input type="text" value="${pod.Adresa || ''}"></label>
-          <label>Telefon: <input type="text" value="${pod.Telefon || ''}"></label>
-          <label><input type="checkbox" ${pod.Slikano === "on" ? 'checked' : ''}> Slikano</label>
-          <button>Sačuvaj</button>
+        kartica.innerHTML = `
+          <label>Vreme: <strong>${vreme}</strong></label>
+          <label>Šifra stana:</label>
+          <input value="${podatak['Šifra stana'] || ''}" class="sifra">
+          <label>Agent:</label>
+          <select class="agent">
+            <option value="">-- Izaberi --</option>
+            ${agenti.map(a => `<option value="${a}" ${podatak.Agent === a ? 'selected' : ''}>${a}</option>`).join('')}
+          </select>
+          <label>Adresa:</label>
+          <input value="${podatak.Adresa || ''}" class="adresa">
+          <label>Telefon:</label>
+          <input value="${podatak.Telefon || ''}" class="telefon">
+          <label><input type="checkbox" class="slikano" ${podatak.Slikano === "DA" ? 'checked' : ''}> Slikano</label>
+          <button onclick="sacuvaj(this, '${vreme}')">Sačuvaj</button>
         `;
 
-        const btn = div.querySelector("button");
-        btn.onclick = async () => {
-          const sifra = div.querySelector("input[type='text']").value.trim();
-          const agent = div.querySelector("select").value;
-          const adresa = div.querySelectorAll("input[type='text']")[1].value.trim();
-          const telefon = div.querySelectorAll("input[type='text']")[2].value.trim();
-          const slikano = div.querySelector("input[type='checkbox']").checked;
+        container.appendChild(kartica);
 
-          const data = {
-            Datum: datumSrbija,
-            Vreme: vreme,
-            "Šifra stana": sifra,
-            Agent: agent,
-            Adresa: adresa,
-            Telefon: telefon,
-            Slikano: slikano ? "on" : ""
-          };
-
-          await fetch(`${API_URL}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data })
-          });
-
-          alert("Sačuvano!");
-          if (slikano && agenti.includes(agent)) {
-            agentBrojanja[agent]++;
-            div.classList.add("zatamnjeno");
-            azurirajBrojace();
-          }
-        };
-
-        kont.appendChild(div);
+        // brojanje ako je slikano
+        const agent = podatak.Agent;
+        if (podatak.Slikano === "DA" && agent) {
+          brojac[agent] = (brojac[agent] || 0) + 1;
+        }
       });
 
-      azurirajBrojace();
+      // prikaz statistike
+      const stats = document.getElementById("statistika");
+      stats.innerHTML = "Statistika slikanja:<br>" + Object.entries(brojac).map(([a, b]) => `${a}: ${b} stanova`).join("<br>");
     }
 
-    function azurirajBrojace() {
-      const div = document.getElementById("brojaci");
-      div.innerHTML = `<h3>Broj slikanja po agentima:</h3><ul>` +
-        agenti.map(ag => `<li>${ag}: ${agentBrojanja[ag]}</li>`).join("") +
-        `</ul>`;
+    async function sacuvaj(btn, vreme) {
+      const kartica = btn.closest(".kartica");
+      const sifra = kartica.querySelector(".sifra").value;
+      const agent = kartica.querySelector(".agent").value;
+      const adresa = kartica.querySelector(".adresa").value;
+      const telefon = kartica.querySelector(".telefon").value;
+      const slikano = kartica.querySelector(".slikano").checked ? "DA" : "NE";
+
+      const podatak = {
+        Datum: izabraniDatum,
+        Vreme: vreme,
+        "Šifra stana": sifra,
+        Agent: agent,
+        Adresa: adresa,
+        Telefon: telefon,
+        Slikano: slikano
+      };
+
+      await fetch(apiUrl + "?search=Datum:" + izabraniDatum + ",Vreme:" + vreme, {
+        method: "DELETE"
+      });
+
+      await fetch(apiUrl, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({data: [podatak]})
+      });
+
+      ucitajTermine();
     }
 
+    napuniDatumDropdown();
     ucitajTermine();
   </script>
 </body>
