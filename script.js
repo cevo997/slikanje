@@ -1,103 +1,96 @@
-const apiUrl = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
-const terminiDiv = document.getElementById("termini");
-const izborDatuma = document.getElementById("izborDatuma");
+const API_URL = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
 const agenti = ["SAŠKA", "CECA", "LJILJA", "RUŽA", "SEKA", "SANDRA", "NIKOLA", "ANĐELA", "ATINA", "VIŠNJA", "MILA", "BUDA", "NATAŠA"];
+const vremeTermina = [
+  "09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00",
+  "13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30",
+  "18:00","18:30","19:00","19:30"
+];
 
-let izabraniDatum = new Date().toISOString().split("T")[0];
-izborDatuma.value = izabraniDatum;
+document.addEventListener("DOMContentLoaded", () => {
+  const izborDatuma = document.getElementById("izborDatuma");
+  // postavi današnji datum kao podrazumevani
+  izborDatuma.value = new Date().toISOString().split("T")[0];
 
-function kreirajTermine() {
-  terminiDiv.innerHTML = "";
-  const vremena = kreirajVremena();
-  vremena.forEach((vreme) => {
-    const kartica = document.createElement("div");
-    kartica.className = "kartica";
-    kartica.innerHTML = `
-      <h3>${vreme}</h3>
-      <p class="datum-label">${izabraniDatum}</p>
-      <input placeholder="Šifra stana" class="sifra">
-      <select class="agent">
-        <option value="">Agent</option>
-        ${agenti.map((a) => `<option>${a}</option>`).join("")}
-      </select>
-      <input placeholder="Adresa" class="adresa">
-      <input placeholder="Telefon" class="telefon">
-      <label><input type="checkbox" class="slikano"> Slikano</label>
-      <button class="sacuvaj">Sačuvaj</button>
-    `;
-    kartica.querySelector(".sacuvaj").addEventListener("click", () => {
-      const sifra = kartica.querySelector(".sifra").value;
-      const agent = kartica.querySelector(".agent").value;
-      const adresa = kartica.querySelector(".adresa").value;
-      const telefon = kartica.querySelector(".telefon").value;
-      const slikano = kartica.querySelector(".slikano").checked;
-
-      const podaci = {
-        Datum: izabraniDatum,
-        Vreme: vreme,
-        "Šifra stana": sifra,
-        Agent: agent,
-        Adresa: adresa,
-        Telefon: telefon,
-        Slikano: slikano ? "TRUE" : "FALSE"
-      };
-
-      fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: podaci })
-      }).then(() => {
-        alert("Sačuvano!");
-        ucitajTermine(izabraniDatum); // ✅ osveži kartice odmah
-      });
-    });
-    terminiDiv.appendChild(kartica);
+  izborDatuma.addEventListener("change", () => {
+    prikaziTermine(izborDatuma.value);
   });
-}
 
-function kreirajVremena() {
-  const vremena = [];
-  let sati = 9, minuti = 0;
-  while (sati < 20) {
-    const sat = sati.toString().padStart(2, "0");
-    const min = minuti.toString().padStart(2, "0");
-    vremena.push(`${sat}:${min}`);
-    minuti += 30;
-    if (minuti === 60) {
-      minuti = 0;
-      sati++;
-    }
-  }
-  return vremena;
-}
-
-function ucitajTermine(datum) {
-  izabraniDatum = datum;
-  fetch(`${apiUrl}/search?Datum=${datum}`)
-    .then(res => res.json())
-    .then(podaci => {
-      kreirajTermine();
-      if (!Array.isArray(podaci)) return;
-      podaci.forEach((termin) => {
-        const kartice = document.querySelectorAll(".kartica");
-        kartice.forEach((k) => {
-          if (k.querySelector("h3").textContent === termin.Vreme) {
-            k.querySelector(".sifra").value = termin["Šifra stana"] || "";
-            k.querySelector(".agent").value = termin.Agent || "";
-            k.querySelector(".adresa").value = termin.Adresa || "";
-            k.querySelector(".telefon").value = termin.Telefon || "";
-            if (termin.Slikano === "TRUE") {
-              k.querySelector(".slikano").checked = true;
-              k.style.opacity = 0.5;
-            }
-          }
-        });
-      });
-    });
-}
-
-izborDatuma.addEventListener("change", () => {
-  ucitajTermine(izborDatuma.value);
+  prikaziTermine(izborDatuma.value);
 });
 
-ucitajTermine(izabraniDatum); // učitava današnji datum na startu
+function prikaziTermine(datum) {
+  fetch(`${API_URL}?Datum=${datum}`)
+    .then(res => {
+      if (!res.ok) throw new Error("Greška pri dohvaćanju podataka");
+      return res.json();
+    })
+    .then(data => {
+      const container = document.getElementById("termini");
+      container.innerHTML = "";
+
+      vremeTermina.forEach(vreme => {
+        const entry = data.find(d => d.Vreme === vreme);
+
+        const div = document.createElement("div");
+        div.className = "termin";
+
+        if (entry && entry.Slikano === "TRUE") div.classList.add("zavrseno");
+
+        div.innerHTML = `
+          <div><strong>Datum:</strong> ${datum}</div>
+          <div><strong>Termin:</strong> ${vreme}</div>
+          <label>Šifra stana</label><input type="text" value="${entry ? entry["Šifra stana"] : ""}" />
+          <label>Adresa</label><input type="text" value="${entry ? entry.Adresa : ""}" />
+          <label>Telefon</label><input type="text" value="${entry ? entry.Telefon : ""}" />
+          <label>Agent</label>
+          <select>
+            ${agenti.map(agent => `<option${entry && entry.Agent === agent ? " selected" : ""}>${agent}</option>`).join("")}
+          </select>
+          <label><input type="checkbox" ${entry && entry.Slikano === "TRUE" ? "checked" : ""}/> Slikano</label>
+          <button onclick="sacuvaj(this, '${datum}', '${vreme}')">Sačuvaj</button>
+        `;
+
+        container.appendChild(div);
+      });
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Došlo je do greške pri učitavanju termina.");
+    });
+}
+
+function sacuvaj(btn, datum, vreme) {
+  const kartica = btn.parentElement;
+  const sifra = kartica.querySelectorAll("input")[1].value;
+  const adresa = kartica.querySelectorAll("input")[2].value;
+  const telefon = kartica.querySelectorAll("input")[3].value;
+  const agent = kartica.querySelector("select").value;
+  const slikano = kartica.querySelector("input[type=checkbox]").checked ? "TRUE" : "";
+
+  const noviUnos = {
+    Datum: datum,
+    Vreme: vreme,
+    "Šifra stana": sifra,
+    Adresa: adresa,
+    Telefon: telefon,
+    Agent: agent,
+    Slikano: slikano
+  };
+
+  fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: [noviUnos] })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Greška pri čuvanju");
+    return res.json();
+  })
+  .then(() => {
+    prikaziTermine(datum);
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Došlo je do greške pri čuvanju.");
+  });
+}
