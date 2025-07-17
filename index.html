@@ -2,139 +2,151 @@
 <html lang="sr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Zakazivanje Slikanja</title>
+  <title>Zakazivanje slikanja</title>
   <style>
-    body { font-family: sans-serif; background: #f2f2f2; margin: 0; padding: 20px; }
-    h1 { text-align: center; }
-    #izborDatuma { margin-bottom: 20px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
     .kartica {
-      background: white;
+      display: inline-block;
+      width: 220px;
       border: 1px solid #ccc;
-      padding: 10px;
       border-radius: 8px;
+      margin: 5px;
+      padding: 10px;
+      background: #f9f9f9;
+      vertical-align: top;
       transition: background 0.3s;
     }
-    .zatamnjeno {
-      background: #d3d3d3;
+    .kartica.zatamnjeno {
+      background: #ddd;
     }
-    label { display: block; margin-top: 5px; }
-    input, select { width: 100%; padding: 5px; margin-top: 3px; }
-    button { margin-top: 10px; width: 100%; padding: 7px; background: #007bff; color: white; border: none; border-radius: 4px; }
-    #brojanje { margin-top: 20px; background: #fff; padding: 10px; border-radius: 6px; }
+    label {
+      display: block;
+      margin-top: 5px;
+    }
+    input, select {
+      width: 100%;
+      padding: 4px;
+      margin-top: 2px;
+    }
+    button {
+      margin-top: 8px;
+      width: 100%;
+      padding: 6px;
+    }
+    .agent-brojac {
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
-  <h1>Zakazivanje Slikanja</h1>
-  <label for="izborDatuma">Izaberi datum:</label>
-  <input type="date" id="izborDatuma"/>
-
-  <div class="grid" id="sviTermini"></div>
-
-  <div id="brojanje"></div>
+  <h1>Zakazivanje slikanja</h1>
+  <div id="kartice"></div>
+  <div class="agent-brojac" id="brojaci"></div>
 
   <script>
     const API_URL = 'https://sheetdb.io/api/v1/ywvbhlm9ikdui';
-    const TERMINI = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"];
-    const AGENTI = ["SAŠKA","CECA","LJILJA","RUŽA","SEKA","SANDRA","NIKOLA","ANĐELA","ATINA","VIŠNJA","MILA","BUDA","NATAŠA"];
-    const emailZaObavestenje = "stefanbarac@gmail.com";
-    let trenutnoOdabraniDatum;
+    const agenti = ["SAŠKA","CECA","LJILJA","RUŽA","SEKA","SANDRA","NIKOLA","ANĐELA","ATINA","VIŠNJA","MILA","BUDA","NATAŠA"];
+    const vremeTermina = [
+      "09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30",
+      "13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30",
+      "17:00","17:30","18:00","18:30","19:00","19:30"
+    ];
 
-    document.getElementById("izborDatuma").valueAsDate = new Date();
-    document.getElementById("izborDatuma").addEventListener("change", ucitajTermine);
+    let agentBrojanja = {};
 
-    ucitajTermine();
+    agenti.forEach(a => agentBrojanja[a] = 0);
+
+    const danas = new Date();
+    const datumSrbija = new Date(danas.toLocaleString("en-US", {timeZone: "Europe/Belgrade"}))
+      .toISOString().split("T")[0];
 
     async function ucitajTermine() {
-      const datum = document.getElementById("izborDatuma").value;
-      trenutnoOdabraniDatum = datum;
-      const response = await fetch(`${API_URL}?date=${datum}`);
-      const podaci = await response.json();
-      const container = document.getElementById("sviTermini");
-      container.innerHTML = "";
+      const res = await fetch(`${API_URL}?search=Datum&value=${datumSrbija}`);
+      const podaci = await res.json();
+      const mapa = {};
+      podaci.forEach(el => {
+        mapa[el.Vreme] = el;
+        if (el.Slikano === "on" && agenti.includes(el.Agent)) {
+          agentBrojanja[el.Agent]++;
+        }
+      });
+      crtajKartice(mapa);
+    }
 
-      const agentBrojac = {};
-      TERMINI.forEach(vreme => {
-        const postojeci = podaci.find(p => p.Datum === datum && p.Vreme === vreme) || {};
+    function crtajKartice(mapa) {
+      const kont = document.getElementById("kartice");
+      kont.innerHTML = "";
+
+      vremeTermina.forEach(vreme => {
+        const pod = mapa[vreme] || {};
         const div = document.createElement("div");
         div.className = "kartica";
+        if (pod.Slikano === "on") div.classList.add("zatamnjeno");
+
         div.innerHTML = `
-          <strong>${vreme}</strong>
-          <label>Šifra stana: <input value="${postojeci['Šifra stana'] || ""}" class="sifra"/></label>
+          <h4>${vreme}</h4>
+          <label>Šifra stana: <input type="text" value="${pod['Šifra stana'] || ''}"></label>
           <label>Agent:
-            <select class="agent">
-              <option value="">--izaberi--</option>
-              ${AGENTI.map(a => `<option ${a === postojeci.Agent ? "selected" : ""}>${a}</option>`).join("")}
+            <select>
+              <option value="">Izaberi</option>
+              ${agenti.map(ag => `<option ${pod.Agent === ag ? 'selected' : ''}>${ag}</option>`).join("")}
             </select>
           </label>
-          <label>Adresa: <input value="${postojeci.Adresa || ""}" class="adresa"/></label>
-          <label>Telefon: <input value="${postojeci.Telefon || ""}" class="telefon"/></label>
-          <label><input type="checkbox" class="slikano" ${postojeci.Slikano === "TRUE" ? "checked" : ""}/> Slikano</label>
-          <button class="sacuvaj">Sačuvaj</button>
+          <label>Adresa: <input type="text" value="${pod.Adresa || ''}"></label>
+          <label>Telefon: <input type="text" value="${pod.Telefon || ''}"></label>
+          <label><input type="checkbox" ${pod.Slikano === "on" ? 'checked' : ''}> Slikano</label>
+          <button>Sačuvaj</button>
         `;
 
-        if (postojeci.Slikano === "TRUE") div.classList.add("zatamnjeno");
+        const btn = div.querySelector("button");
+        btn.onclick = async () => {
+          const sifra = div.querySelector("input[type='text']").value.trim();
+          const agent = div.querySelector("select").value;
+          const adresa = div.querySelectorAll("input[type='text']")[1].value.trim();
+          const telefon = div.querySelectorAll("input[type='text']")[2].value.trim();
+          const slikano = div.querySelector("input[type='checkbox']").checked;
 
-        const check = div.querySelector(".slikano");
-        check.addEventListener("change", () => {
-          if (check.checked) div.classList.add("zatamnjeno");
-          else div.classList.remove("zatamnjeno");
-        });
-
-        const dugme = div.querySelector(".sacuvaj");
-        dugme.addEventListener("click", async () => {
-          const sifra = div.querySelector(".sifra").value;
-          const agent = div.querySelector(".agent").value;
-          const adresa = div.querySelector(".adresa").value;
-          const telefon = div.querySelector(".telefon").value;
-          const slikano = div.querySelector(".slikano").checked;
-          const payload = {
-            Datum: datum,
+          const data = {
+            Datum: datumSrbija,
             Vreme: vreme,
             "Šifra stana": sifra,
             Agent: agent,
             Adresa: adresa,
             Telefon: telefon,
-            Slikano: slikano ? "TRUE" : "FALSE"
+            Slikano: slikano ? "on" : ""
           };
-          await fetch(API_URL, {
+
+          await fetch(`${API_URL}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data: [payload] })
+            body: JSON.stringify({ data })
           });
+
           alert("Sačuvano!");
-          ucitajTermine();
-        });
+          if (slikano && agenti.includes(agent)) {
+            agentBrojanja[agent]++;
+            div.classList.add("zatamnjeno");
+            azurirajBrojace();
+          }
+        };
 
-        if (postojeci.Slikano === "TRUE" && postojeci.Agent) {
-          agentBrojac[postojeci.Agent] = (agentBrojac[postojeci.Agent] || 0) + 1;
-        }
-
-        // Provera za email (ako starije od 2 dana i nije slikano)
-        const danas = new Date();
-        const datumObj = new Date(datum);
-        const diff = Math.floor((danas - datumObj) / (1000 * 60 * 60 * 24));
-        if (diff > 2 && postojeci.Slikano !== "TRUE" && postojeci['Šifra stana']) {
-          fetch(`https://formsubmit.co/ajax/${emailZaObavestenje}`, {
-            method: "POST",
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              subject: "Nije slikano starije od 2 dana",
-              message: `Stan ${postojeci['Šifra stana']} (${postojeci.Adresa}) nije slikano od ${datum} u ${vreme}.`
-            })
-          });
-        }
-
-        container.appendChild(div);
+        kont.appendChild(div);
       });
 
-      // Prikaz broja stanova po agentu
-      const brojacDiv = document.getElementById("brojanje");
-      brojacDiv.innerHTML = "<h3>Broj slikanih stanova po agentu:</h3><ul>" +
-        Object.entries(agentBrojac).map(([agent, broj]) => `<li>${agent}: ${broj}</li>`).join("") +
-        "</ul>";
+      azurirajBrojace();
     }
+
+    function azurirajBrojace() {
+      const div = document.getElementById("brojaci");
+      div.innerHTML = `<h3>Broj slikanja po agentima:</h3><ul>` +
+        agenti.map(ag => `<li>${ag}: ${agentBrojanja[ag]}</li>`).join("") +
+        `</ul>`;
+    }
+
+    ucitajTermine();
   </script>
 </body>
 </html>
