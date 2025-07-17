@@ -8,10 +8,13 @@
 </head>
 <body>
   <h1>Zakazivanje Slikanja</h1>
+
   <div class="selector">
-    <label for="izborDatuma">Izaberi datum:</label>
-    <input type="date" id="izborDatuma" />
+    <label for="datum">Izaberi datum:</label>
+    <input type="date" id="datum" />
+    <button onclick="ucitajTermine()">Učitaj termine</button>
   </div>
+
   <div id="termini"></div>
   <div id="statistika"></div>
 
