@@ -1,246 +1,106 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Zakazivanje Slikanja</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; background: #eef1f5; }
-  h1 { text-align: center; margin-bottom: 20px; }
-  .day { max-width: 900px; margin: 0 auto; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(260px,1fr));
-    gap: 15px;
-  }
-  .slot {
-    background: white;
-    padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 0 8px rgba(0,0,0,0.1);
-  }
-  .slot h4 {
-    margin: 0 0 8px 0;
-    font-size: 16px;
-  }
-  .slot input[type=text], .slot input[type=tel] {
-    width: 100%;
-    padding: 6px;
-    margin-bottom: 6px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box;
-  }
-  .slot label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 14px;
-  }
-  .slot button {
-    width: 100%;
-    padding: 8px;
-    background: #1a73e8;
-    border: none;
-    color: white;
-    font-size: 14px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  .slot.filled {
-    background: #d4edda;
-  }
-  #datumSelector {
-    display: block;
-    margin: 0 auto 20px auto;
-    padding: 6px 10px;
-    font-size: 16px;
-    border-radius: 5px;
-  }
-  #statusMsg {
-    text-align: center;
-    margin-bottom: 15px;
-    color: #333;
-    font-weight: bold;
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Zakazivanje slikanja</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .slot { border: 1px solid #ccc; padding: 10px; margin: 5px; display: inline-block; width: 180px; }
+    .slot input[type="checkbox"] { margin-top: 5px; }
+  </style>
 </head>
 <body>
+  <h1>Zakazivanje slikanja</h1>
+  <label>Datum: <input type="date" id="datum" /></label>
+  <button onclick="loadTermini()">Učitaj termine</button>
 
-<h1>Zakazivanje Slikanja</h1>
+  <div id="terminiGrid"></div>
+  <button onclick="sacuvaj()">Sačuvaj sve</button>
 
-<select id="datumSelector"></select>
-<div id="statusMsg"></div>
-<div class="day">
-  <div class="grid" id="gridSlots"></div>
-</div>
+  <script>
+    const termini = [
+      "09:00", "09:30", "10:00", "10:30",
+      "11:00", "11:30", "12:00", "12:30",
+      "13:00", "13:30", "14:00", "14:30",
+      "15:00", "15:30", "16:00", "16:30",
+      "17:00", "17:30", "18:00", "18:30",
+      "19:00", "19:30"
+    ];
 
-<script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz5Vq3eLkpvkM38Z1_wW0nS_4iFXpZA0SQkIg6RCXwfPHNVdNqlZbfvExbei2_YaghUdQ/exec"; // zameni ovde
+    let stanja = {};
 
-  const startHour = 9;
-  const endHour = 19;
-  const interval = 30;
+    function renderGrid(podatak) {
+      const grid = document.getElementById("terminiGrid");
+      grid.innerHTML = "";
 
-  let currentDate = new Date();
-  let datumKey = formatDateISO(currentDate);
+      termini.forEach(termin => {
+        const info = podatak.find(p => p.termin === termin) || {};
+        stanja[termin] = info;
 
-  function formatDateISO(d) {
-    return d.toISOString().split("T")[0];
-  }
-
-  function formatDateDisplay(d) {
-    return d.split("-").reverse().join(".");
-  }
-
-  function generateTimeSlots() {
-    const slots = [];
-    for(let h = startHour; h <= endHour; h++) {
-      for(let m = 0; m < 60; m += interval) {
-        slots.push(`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`);
-      }
+        const div = document.createElement("div");
+        div.className = "slot";
+        div.innerHTML = `
+          <strong>${termin}</strong><br/>
+          Šifra: <input value="${info.sifraStana || ''}" onchange="azuriraj('${termin}', 'sifraStana', this.value)" /><br/>
+          Agent: <input value="${info.agent || ''}" onchange="azuriraj('${termin}', 'agent', this.value)" /><br/>
+          Adresa: <input value="${info.adresa || ''}" onchange="azuriraj('${termin}', 'adresa', this.value)" /><br/>
+          Tel: <input value="${info.telefon || ''}" onchange="azuriraj('${termin}', 'telefon', this.value)" /><br/>
+          Slikano: <input type="checkbox" ${info.slikano ? 'checked' : ''} onchange="azuriraj('${termin}', 'slikano', this.checked)" />
+        `;
+        grid.appendChild(div);
+      });
     }
-    return slots;
-  }
 
-  async function fetchSlots(dateStr) {
-    try {
-      const res = await fetch(`${SCRIPT_URL}?action=getByDate&datum=${dateStr}`);
-      if(!res.ok) throw new Error("Network error");
-      const data = await res.json();
-      return data;
-    } catch(e) {
-      document.getElementById("statusMsg").textContent = "Greška pri učitavanju podataka.";
-      return [];
+    function azuriraj(termin, polje, vrednost) {
+      if (!stanja[termin]) stanja[termin] = { termin };
+      stanja[termin][polje] = vrednost;
     }
-  }
 
-  async function saveSlot(dateStr, timeStr, slotData, btn) {
-    try {
-      btn.disabled = true;
-      btn.textContent = "Čuvanje...";
+    function sacuvaj() {
+      const datum = document.getElementById("datum").value;
+      if (!datum) return alert("Unesi datum!");
 
-      const params = new URLSearchParams({
-        action: "update",
-        datum: dateStr,
-        termin: timeStr,
-        sifraStana: slotData.sifra || "",
-        agent: slotData.agent || "",
-        adresa: slotData.adresa || "",
-        telefon: slotData.telefon || "",
-        slikano: slotData.slikano ? "true" : "false"
+      Object.keys(stanja).forEach(termin => {
+        const podatak = stanja[termin];
+        if (podatak.sifraStana || podatak.agent || podatak.adresa || podatak.telefon || podatak.slikano) {
+          const params = new URLSearchParams({
+            datum: datum,
+            termin: termin,
+            sifraStana: podatak.sifraStana || "",
+            agent: podatak.agent || "",
+            adresa: podatak.adresa || "",
+            telefon: podatak.telefon || "",
+            slikano: podatak.slikano ? "true" : "false",
+            callback: "callback"
+          });
+
+          const url = 'https://script.google.com/macros/s/AKfycbx4jchhNosP2vCpL0RV46fOqVX4LWCnVrXLkXIMyi7YIkw0NHxyfChO0HqyFbk480K7Yw/exec?' + params.toString();
+
+          const script = document.createElement("script");
+          script.src = url;
+          document.body.appendChild(script);
+        }
       });
 
-      const res = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-      const json = await res.json();
-
-      if (json.status === "success") {
-        btn.textContent = "Sačuvano ✔";
-        btn.parentElement.classList.add("filled");
-      } else {
-        btn.textContent = "Greška!";
-      }
-
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.textContent = "Sačuvaj";
-      }, 1500);
-
-    } catch(e) {
-      btn.textContent = "Greška!";
-      btn.disabled = false;
+      alert("Sačuvano!");
     }
-  }
 
-  function renderSlots(dateStr, data) {
-    const grid = document.getElementById("gridSlots");
-    grid.innerHTML = "";
+    function loadTermini() {
+      const datum = document.getElementById("datum").value;
+      if (!datum) return alert("Unesi datum!");
 
-    const slots = generateTimeSlots();
+      const url = `https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec?action=load&datum=${datum}&callback=ucitaj`;
 
-    slots.forEach(time => {
-      const slotData = data.find(d => d.Termin === time) || {
-        SifraStana: "", Agent: "", Adresa: "", Telefon: "", Slikano: false
-      };
-
-      const div = document.createElement("div");
-      div.className = "slot";
-      if(slotData.SifraStana || slotData.Agent || slotData.Adresa || slotData.Telefon) {
-        div.classList.add("filled");
-      }
-
-      div.innerHTML = `
-        <h4>${time}</h4>
-        <input type="text" placeholder="Šifra stana" class="sifra" value="${slotData.SifraStana}" />
-        <input type="text" placeholder="Agent" class="agent" value="${slotData.Agent}" />
-        <input type="text" placeholder="Adresa" class="adresa" value="${slotData.Adresa}" />
-        <input type="tel" placeholder="Telefon" class="telefon" value="${slotData.Telefon}" />
-        <label><input type="checkbox" class="slikano" ${slotData.Slikano ? "checked" : ""} /> Slikano</label>
-        <button>Sačuvaj</button>
-      `;
-
-      const btn = div.querySelector("button");
-      btn.onclick = () => {
-        const novaVrednost = {
-          sifra: div.querySelector(".sifra").value,
-          agent: div.querySelector(".agent").value,
-          adresa: div.querySelector(".adresa").value,
-          telefon: div.querySelector(".telefon").value,
-          slikano: div.querySelector(".slikano").checked
-        };
-        saveSlot(dateStr, time, novaVrednost, btn);
-      };
-
-      grid.appendChild(div);
-    });
-  }
-
-  function populateDateSelector() {
-    const sel = document.getElementById("datumSelector");
-    sel.innerHTML = "";
-
-    // Ubaci danas i narednih 7 dana
-    for(let i=0; i<=7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      const iso = formatDateISO(d);
-      const opt = document.createElement("option");
-      opt.value = iso;
-      opt.textContent = formatDateDisplay(iso);
-      if(iso === datumKey) opt.selected = true;
-      sel.appendChild(opt);
+      const script = document.createElement("script");
+      script.src = url.replace('action=load', 'callback=ucitaj');
+      document.body.appendChild(script);
     }
-  }
 
-  async function loadAndRender(dateStr) {
-    document.getElementById("statusMsg").textContent = "Učitavanje...";
-    const data = await fetchSlots(dateStr);
-    renderSlots(dateStr, data);
-    document.getElementById("statusMsg").textContent = "";
-  }
-
-  document.getElementById("datumSelector").addEventListener("change", e => {
-    datumKey = e.target.value;
-    loadAndRender(datumKey);
-  });
-
-  async function sendReminder() {
-    // poziv akcije za slanje emaila
-    const res = await fetch(`${SCRIPT_URL}?action=sendReminder`);
-    const json = await res.json();
-    if(json.status === "reminder_sent") {
-      alert("Obaveštenje poslato na email.");
-    } else if(json.status === "no_reminder") {
-      alert("Nema nečekiranih termina za podsetnik.");
+    function ucitaj(data) {
+      const datum = document.getElementById("datum").value;
+      const filtrirano = data.filter(x => x.datum === datum);
+      renderGrid(filtrirano);
     }
-  }
-
-  window.onload = () => {
-    populateDateSelector();
-    loadAndRender(datumKey);
-    // primer: svakih 12 sati šalje podsetnik (može se zakazati i u GAS cron)
-    // setInterval(sendReminder, 12 * 60 * 60 * 1000);
-  };
-</script>
-
+  </script>
 </body>
 </html>
