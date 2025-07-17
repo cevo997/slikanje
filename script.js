@@ -1,93 +1,104 @@
 const API_URL = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
+const terminiDiv = document.getElementById("termini");
+const izborDatuma = document.getElementById("izborDatuma");
+
 const agenti = [
-  "SAŠKA", "CECA", "LJILJA", "RUŽA", "SEKA",
-  "SANDRA", "NIKOLA", "ANĐELA", "ATINA", "VIŠNJA", "MILA", "BUDA", "NATAŠA"
+  "SAŠKA", "CECA", "LJILJA", "RUŽA", "SEKA", "SANDRA",
+  "NIKOLA", "ANĐELA", "ATINA", "VIŠNJA", "MILA",
+  "BUDA", "NATAŠA"
 ];
 
-const vremena = [
-  "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30",
-  "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30",
-  "17:00", "17:30", "18:00", "18:30",
-  "19:00", "19:30"
-];
+// Automatski postavi današnji datum pri učitavanju
+const danas = new Date().toISOString().split("T")[0];
+izborDatuma.value = danas;
+ucitajTermine(danas);
 
-function ucitajTermine() {
-  const datumInput = document.getElementById("datum");
-  const datum = datumInput.value;
+izborDatuma.addEventListener("change", () => {
+  ucitajTermine(izborDatuma.value);
+});
 
-  if (!datum) {
-    alert("Izaberite datum!");
-    return;
+function ucitajTermine(datum) {
+  terminiDiv.innerHTML = ""; // Očisti prethodni sadržaj
+
+  const vremena = [];
+  for (let h = 9; h <= 19; h++) {
+    vremena.push(`${h.toString().padStart(2, '0')}:00`);
+    vremena.push(`${h.toString().padStart(2, '0')}:30`);
   }
 
   fetch(`${API_URL}/search?Datum=${datum}`)
     .then(res => res.json())
     .then(podaci => {
-      const terminiDiv = document.getElementById("termini");
-      terminiDiv.innerHTML = "";
-
       vremena.forEach(vreme => {
-        let unos = Array.isArray(podaci) ? podaci.find(p => p.Vreme === vreme) : null;
+        const termin = Array.isArray(podaci)
+          ? podaci.find(p => p.Vreme === vreme)
+          : null;
 
-        const div = document.createElement("div");
-        div.className = "kartica";
+        const kartica = document.createElement("div");
+        kartica.className = "kartica";
+        if (termin?.Slikano === "TRUE") kartica.classList.add("slikano");
 
-        div.innerHTML = `
-          <h3>${vreme}</h3>
-          <input type="text" placeholder="Šifra stana" value="${unos?.["Šifra stana"] || ""}" />
+        const datumEl = document.createElement("div");
+        datumEl.className = "datum-info";
+        datumEl.textContent = datum;
+        kartica.appendChild(datumEl);
+
+        kartica.innerHTML += `
+          <strong>${vreme}</strong><br/>
+          <label>Šifra:</label>
+          <input type="text" value="${termin?.['Šifra stana'] || ''}" /><br/>
+          <label>Agent:</label>
           <select>
-            <option value="">Agent</option>
-            ${agenti.map(agent => `
-              <option value="${agent}" ${unos?.Agent === agent ? "selected" : ""}>${agent}</option>
-            `).join("")}
+            ${agenti.map(a => `<option ${termin?.Agent === a ? 'selected' : ''}>${a}</option>`).join("")}
           </select>
-          <input type="text" placeholder="Adresa" value="${unos?.Adresa || ""}" />
-          <input type="text" placeholder="Telefon" value="${unos?.Telefon || ""}" />
-          <label>
-            <input type="checkbox" ${unos?.Slikano === "TRUE" ? "checked" : ""} />
-            Slikano
-          </label>
-          <button onclick="sacuvajTermin(this, '${datum}', '${vreme}')">Sačuvaj</button>
+          <label>Adresa:</label>
+          <input type="text" value="${termin?.Adresa || ''}" /><br/>
+          <label>Telefon:</label>
+          <input type="tel" value="${termin?.Telefon || ''}" /><br/>
+          <label>Slikano:</label>
+          <input type="checkbox" ${termin?.Slikano === "TRUE" ? "checked" : ""} /><br/>
+          <button onclick="sacuvaj(this, '${datum}', '${vreme}')">Sačuvaj</button>
         `;
 
-        if (unos?.Slikano === "TRUE") div.classList.add("slikano");
-
-        terminiDiv.appendChild(div);
+        terminiDiv.appendChild(kartica);
       });
     });
 }
 
-function sacuvajTermin(dugme, datum, vreme) {
+function sacuvaj(dugme, datum, vreme) {
   const kartica = dugme.parentElement;
-  const inputs = kartica.querySelectorAll("input");
-  const select = kartica.querySelector("select");
-
-  const sifra = inputs[0].value;
-  const agent = select.value;
-  const adresa = inputs[1].value;
-  const telefon = inputs[2].value;
-  const slikano = inputs[3].checked;
-
+  const inputs = kartica.querySelectorAll("input, select");
   const podaci = {
     Datum: datum,
     Vreme: vreme,
-    "Šifra stana": sifra,
-    Agent: agent,
-    Adresa: adresa,
-    Telefon: telefon,
-    Slikano: slikano ? "TRUE" : "FALSE"
+    "Šifra stana": inputs[1].value,
+    Agent: inputs[2].value,
+    Adresa: inputs[3].value,
+    Telefon: inputs[4].value,
+    Slikano: inputs[5].checked ? "TRUE" : "FALSE"
   };
 
+  // Brišemo prethodni unos za isti datum + vreme
+  fetch(`${API_URL}/search?Datum=${datum}&Vreme=${vreme}`)
+    .then(res => res.json())
+    .then(pronadjeni => {
+      if (Array.isArray(pronadjeni) && pronadjeni.length > 0) {
+        const id = pronadjeni[0].id;
+        fetch(`${API_URL}/id/${id}`, {
+          method: "DELETE"
+        }).then(() => dodajNovi(podaci));
+      } else {
+        dodajNovi(podaci);
+      }
+    });
+}
+
+function dodajNovi(podaci) {
   fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ data: [podaci] })
-  })
-    .then(res => res.json())
-    .then(() => {
-      alert("Sačuvano!");
-      ucitajTermine();
-    });
+  }).then(() => {
+    ucitajTermine(podaci.Datum);
+  });
 }
