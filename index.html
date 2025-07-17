@@ -1,255 +1,175 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Zakazivanje Slikanja</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #eef1f5;
-    margin: 20px;
-  }
-  h1 {
-    text-align: center;
-    color: #333;
-  }
-  #datePicker {
-    display: block;
-    margin: 10px auto 20px auto;
-    font-size: 16px;
-    padding: 5px;
-  }
-  #slotsContainer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    justify-content: center;
-  }
-  .slotCard {
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 0 6px rgba(0,0,0,0.1);
-    padding: 15px;
-    width: 220px;
-    box-sizing: border-box;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-  }
-  .slotCard.filled {
-    background: #d0f0d0;
-  }
-  .slotCard label {
-    font-weight: bold;
-    margin-bottom: 8px;
-    font-size: 14px;
-  }
-  .slotCard input[type="text"],
-  .slotCard input[type="tel"] {
-    padding: 6px;
-    margin-bottom: 8px;
-    font-size: 13px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-  }
-  .slotCard input[type="checkbox"] {
-    margin-left: 5px;
-    transform: scale(1.1);
-    vertical-align: middle;
-  }
-  .slotCard button {
-    padding: 8px;
-    font-size: 14px;
-    border: none;
-    background-color: #007acc;
-    color: white;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-top: auto;
-  }
-  .slotCard button:hover {
-    background-color: #005fa3;
-  }
-  .slikanoLabel {
-    font-weight: normal;
-    font-size: 13px;
-    margin-bottom: 8px;
-    user-select: none;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>Zakazivanje Slikanja</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .selector {
+      margin-bottom: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 15px;
+    }
+    .kartica {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .zatamnjeno {
+      background: #ccc;
+      opacity: 0.6;
+    }
+    label {
+      display: block;
+      margin-top: 5px;
+    }
+    select, input[type="text"], input[type="tel"] {
+      width: 100%;
+      padding: 5px;
+      margin-top: 2px;
+    }
+    .brojaci {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
-
-<h1>Zakazivanje Slikanja</h1>
-<input type="date" id="datePicker" />
-
-<div id="slotsContainer"></div>
-
+  <h1>Zakazivanje Slikanja</h1>
+  <div class="selector">
+    <label for="izborDatuma">Izaberi datum:</label>
+    <input type="date" id="izborDatuma" />
+  </div>
+  <div id="grid" class="grid"></div>
+  <button onclick="sacuvaj()">Sačuvaj</button>
+  <div id="brojaci" class="brojaci"></div>
 <script>
-const API_URL = 'https://sheetdb.io/api/v1/ywvbhlm9ikdui';
-const startHour = 9;
-const endHour = 19;
-const intervalMinutes = 30;
+const API_URL = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
+const termini = generisiTermine();
+const agenti = ["SAŠKA","CECA","LJILJA","RUŽA","SEKA","SANDRA","NIKOLA","ANĐELA","ATINA","VIŠNJA","MILA","BUDA","NATAŠA"];
+let podaci = [];
 
-// Dobavi današnji datum u formatu yyyy-MM-dd prema Srbiji
-function getTodayDate() {
-  const now = new Date();
-  // Srbija je UTC+2 (letnje vreme), računaj lokalno vreme sa pomeranjem
-  const offset = 2 * 60;
-  const local = new Date(now.getTime() + (now.getTimezoneOffset() + offset) * 60000);
-  const y = local.getFullYear();
-  const m = String(local.getMonth() + 1).padStart(2, '0');
-  const d = String(local.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+document.getElementById("izborDatuma").valueAsDate = new Date();
+document.getElementById("izborDatuma").addEventListener("change", ucitajPodatke);
 
-function formatTime(h, m) {
-  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
-}
-
-// Fetch svih termina za određeni datum iz SheetDB API-ja
-async function fetchTermini(datum) {
-  try {
-    const res = await fetch(`${API_URL}?Datum=${datum}`);
-    if (!res.ok) throw new Error('Greška pri učitavanju termina');
-    const data = await res.json();
-    return data; // niz objekata termina
-  } catch (e) {
-    alert('Greška pri komunikaciji sa serverom.');
-    console.error(e);
-    return [];
+function generisiTermine() {
+  let list = [];
+  for (let h = 9; h <= 19; h++) {
+    list.push(`${h.toString().padStart(2, "0")}:00`);
+    list.push(`${h.toString().padStart(2, "0")}:30`);
   }
+  return list;
 }
 
-// Sačuvaj ili izmeni termin u SheetDB (PUT ako postoji, POST ako ne)
-async function sacuvajTermin(datum, vreme, data) {
-  const body = {
-    data: {
-      Datum: datum,
-      Vreme: vreme,
-      'Šifra stana': data.sifraStana,
-      Agent: data.agent,
-      Adresa: data.adresa,
-      Telefon: data.telefon,
-      Slikano: data.slikano ? 'Da' : 'Ne'
+function ucitajPodatke() {
+  const datum = document.getElementById("izborDatuma").value;
+  fetch(`${API_URL}?date=${datum}`)
+    .then(res => res.json())
+    .then(data => {
+      podaci = data;
+      prikaziTermine(datum);
+    });
+}
+
+function prikaziTermine(datum) {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  const brojaci = {};
+
+  termini.forEach(vreme => {
+    const entry = podaci.find(e => e.date === datum && e.time === vreme) || {};
+    const div = document.createElement("div");
+    div.className = "kartica";
+    div.innerHTML = `
+      <h4>${vreme}</h4>
+      <label>Šifra: <input type="text" value="${entry.sifra || ""}" /></label>
+      <label>Adresa: <input type="text" value="${entry.adresa || ""}" /></label>
+      <label>Telefon: <input type="tel" value="${entry.telefon || ""}" /></label>
+      <label>Agent:
+        <select>
+          <option value=""></option>
+          ${agenti.map(a => `<option value="${a}" ${entry.agent === a ? "selected" : ""}>${a}</option>`).join("")}
+        </select>
+      </label>
+      <label><input type="checkbox" ${entry.slikano === "DA" ? "checked" : ""}/> Slikano</label>
+    `;
+    if (entry.slikano === "DA") div.classList.add("zatamnjeno");
+    div.dataset.vreme = vreme;
+    grid.appendChild(div);
+
+    // broji agente
+    if (entry.slikano === "DA" && entry.agent) {
+      brojaci[entry.agent] = (brojaci[entry.agent] || 0) + 1;
     }
-  };
 
-  try {
-    // Prvo proveri da li termin postoji
-    const getRes = await fetch(`${API_URL}?Datum=${datum}&Vreme=${vreme}`);
-    const existing = await getRes.json();
-
-    if (existing.length > 0) {
-      // Postoji, update sa PUT
-      const id = existing[0].id;
-      const putRes = await fetch(`${API_URL}/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+    // proveri za slanje maila
+    const danas = new Date();
+    const terminDatum = new Date(datum);
+    const diff = (danas - terminDatum) / (1000 * 60 * 60 * 24);
+    if (diff > 2 && entry.slikano !== "DA" && entry.sifra) {
+      fetch("https://formsubmit.co/ajax/stefanbarac@gmail.com", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: "Nije slikano!",
+          message: `Stan ${entry.sifra} na adresi ${entry.adresa || "nepoznato"} NIJE slikano (${datum} ${vreme})`
+        })
       });
-      if (!putRes.ok) throw new Error('Neuspešno ažuriranje termina');
-    } else {
-      // Ne postoji, napravi novi sa POST
-      const postRes = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (!postRes.ok) throw new Error('Neuspešno kreiranje termina');
     }
-    alert('Termin sačuvan.');
-    // Posle čuvanja možeš ponovo učitati termine ili samo ažurirati karticu ako hoćeš
-  } catch (e) {
-    alert('Greška prilikom čuvanja termina.');
-    console.error(e);
-  }
+  });
+
+  // prikaz brojača
+  const brojaciDiv = document.getElementById("brojaci");
+  brojaciDiv.innerHTML = "Broj stanova po agentu: " + Object.entries(brojaci).map(([a, b]) => `${a}: ${b}`).join(", ");
 }
 
-function renderTermini(datum, termini) {
-  const container = document.getElementById('slotsContainer');
-  container.innerHTML = ''; // očisti prethodne kartice
+function sacuvaj() {
+  const datum = document.getElementById("izborDatuma").value;
+  const kartice = document.querySelectorAll(".kartica");
 
-  for(let h = startHour; h <= endHour; h++) {
-    for(let m = 0; m < 60; m += intervalMinutes) {
-      const vremeStr = formatTime(h,m);
-      const terminData = termini.find(t => t.Vreme === vremeStr) || null;
+  kartice.forEach(div => {
+    const vreme = div.dataset.vreme;
+    const sifra = div.querySelector("input[type='text']").value;
+    const adresa = div.querySelectorAll("input")[1].value;
+    const telefon = div.querySelector("input[type='tel']").value;
+    const agent = div.querySelector("select").value;
+    const slikano = div.querySelector("input[type='checkbox']").checked ? "DA" : "";
 
-      const card = document.createElement('div');
-      card.className = 'slotCard';
-      if (terminData && (terminData.Agent || terminData.Adresa || terminData['Šifra stana'] || terminData.Telefon)) {
-        card.classList.add('filled');
-      }
+    fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: {
+          date: datum,
+          time: vreme,
+          sifra,
+          adresa,
+          telefon,
+          agent,
+          slikano
+        }
+      })
+    });
+  });
 
-      const label = document.createElement('label');
-      label.textContent = vremeStr;
-      card.appendChild(label);
-
-      const sifraInput = document.createElement('input');
-      sifraInput.placeholder = 'Šifra stana';
-      sifraInput.value = terminData ? terminData['Šifra stana'] : '';
-      card.appendChild(sifraInput);
-
-      const agentInput = document.createElement('input');
-      agentInput.placeholder = 'Agent';
-      agentInput.value = terminData ? terminData.Agent : '';
-      card.appendChild(agentInput);
-
-      const adresaInput = document.createElement('input');
-      adresaInput.placeholder = 'Adresa';
-      adresaInput.value = terminData ? terminData.Adresa : '';
-      card.appendChild(adresaInput);
-
-      const telefonInput = document.createElement('input');
-      telefonInput.placeholder = 'Telefon';
-      telefonInput.type = 'tel';
-      telefonInput.value = terminData ? terminData.Telefon : '';
-      card.appendChild(telefonInput);
-
-      const slikanoLabel = document.createElement('label');
-      slikanoLabel.className = 'slikanoLabel';
-      slikanoLabel.textContent = 'Slikano ';
-      const slikanoCheckbox = document.createElement('input');
-      slikanoCheckbox.type = 'checkbox';
-      slikanoCheckbox.checked = terminData ? (terminData.Slikano === 'Da') : false;
-      slikanoLabel.appendChild(slikanoCheckbox);
-      card.appendChild(slikanoLabel);
-
-      const saveBtn = document.createElement('button');
-      saveBtn.textContent = 'Sačuvaj';
-      saveBtn.onclick = () => {
-        const dataToSave = {
-          sifraStana: sifraInput.value.trim(),
-          agent: agentInput.value.trim(),
-          adresa: adresaInput.value.trim(),
-          telefon: telefonInput.value.trim(),
-          slikano: slikanoCheckbox.checked
-        };
-        sacuvajTermin(datum, vremeStr, dataToSave);
-      };
-      card.appendChild(saveBtn);
-
-      container.appendChild(card);
-    }
-  }
+  setTimeout(() => ucitajPodatke(), 1000);
 }
 
-const datePicker = document.getElementById('datePicker');
-datePicker.value = getTodayDate();
-
-datePicker.addEventListener('change', async () => {
-  const datum = datePicker.value;
-  const termini = await fetchTermini(datum);
-  renderTermini(datum, termini);
-});
-
-// Na učitavanju stranice odmah učitaj termine za danasnji datum
-(async () => {
-  const termini = await fetchTermini(datePicker.value);
-  renderTermini(datePicker.value, termini);
-})();
+ucitajPodatke();
 </script>
-
 </body>
 </html>
