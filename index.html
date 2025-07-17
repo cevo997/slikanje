@@ -1,106 +1,238 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-  <meta charset="UTF-8">
-  <title>Zakazivanje slikanja</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zakazivanje Slikanja</title>
   <style>
-    body { font-family: Arial; padding: 20px; }
-    .slot { border: 1px solid #ccc; padding: 10px; margin: 5px; display: inline-block; width: 180px; }
-    .slot input[type="checkbox"] { margin-top: 5px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #eef1f5;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #terminiContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+    }
+    .terminCard {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 280px;
+      padding: 15px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .terminCard input[type="text"],
+    .terminCard input[type="tel"],
+    .terminCard input[type="date"],
+    .terminCard input[type="time"] {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .terminCard label {
+      font-weight: bold;
+      font-size: 13px;
+      margin-top: 5px;
+    }
+    .btnGroup {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button.saveBtn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    button.deleteBtn {
+      background-color: #f44336;
+      color: white;
+    }
   </style>
 </head>
 <body>
-  <h1>Zakazivanje slikanja</h1>
-  <label>Datum: <input type="date" id="datum" /></label>
-  <button onclick="loadTermini()">Učitaj termine</button>
 
-  <div id="terminiGrid"></div>
-  <button onclick="sacuvaj()">Sačuvaj sve</button>
+  <h1>Zakazivanje Slikanja</h1>
+
+  <div id="terminiContainer"></div>
 
   <script>
-    const termini = [
-      "09:00", "09:30", "10:00", "10:30",
-      "11:00", "11:30", "12:00", "12:30",
-      "13:00", "13:30", "14:00", "14:30",
-      "15:00", "15:30", "16:00", "16:30",
-      "17:00", "17:30", "18:00", "18:30",
-      "19:00", "19:30"
-    ];
+    const API_URL = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
 
-    let stanja = {};
-
-    function renderGrid(podatak) {
-      const grid = document.getElementById("terminiGrid");
-      grid.innerHTML = "";
-
-      termini.forEach(termin => {
-        const info = podatak.find(p => p.termin === termin) || {};
-        stanja[termin] = info;
-
-        const div = document.createElement("div");
-        div.className = "slot";
-        div.innerHTML = `
-          <strong>${termin}</strong><br/>
-          Šifra: <input value="${info.sifraStana || ''}" onchange="azuriraj('${termin}', 'sifraStana', this.value)" /><br/>
-          Agent: <input value="${info.agent || ''}" onchange="azuriraj('${termin}', 'agent', this.value)" /><br/>
-          Adresa: <input value="${info.adresa || ''}" onchange="azuriraj('${termin}', 'adresa', this.value)" /><br/>
-          Tel: <input value="${info.telefon || ''}" onchange="azuriraj('${termin}', 'telefon', this.value)" /><br/>
-          Slikano: <input type="checkbox" ${info.slikano ? 'checked' : ''} onchange="azuriraj('${termin}', 'slikano', this.checked)" />
-        `;
-        grid.appendChild(div);
-      });
+    // Fetch svi termini iz SheetDB
+    async function fetchTermini() {
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("Neuspešan zahtev");
+        const data = await res.json();
+        return data;
+      } catch (err) {
+        alert("Greška pri učitavanju termina: " + err.message);
+        return [];
+      }
     }
 
-    function azuriraj(termin, polje, vrednost) {
-      if (!stanja[termin]) stanja[termin] = { termin };
-      stanja[termin][polje] = vrednost;
-    }
-
-    function sacuvaj() {
-      const datum = document.getElementById("datum").value;
-      if (!datum) return alert("Unesi datum!");
-
-      Object.keys(stanja).forEach(termin => {
-        const podatak = stanja[termin];
-        if (podatak.sifraStana || podatak.agent || podatak.adresa || podatak.telefon || podatak.slikano) {
-          const params = new URLSearchParams({
-            datum: datum,
-            termin: termin,
-            sifraStana: podatak.sifraStana || "",
-            agent: podatak.agent || "",
-            adresa: podatak.adresa || "",
-            telefon: podatak.telefon || "",
-            slikano: podatak.slikano ? "true" : "false",
-            callback: "callback"
+    // Dodaj ili ažuriraj termin (PUT ako ima id, POST ako nema)
+    async function saveTermin(termin, id=null) {
+      try {
+        let res;
+        if (id) {
+          // update - PUT
+          res = await fetch(`${API_URL}/row/${id}`, {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ data: [termin] }),
           });
-
-          const url = 'https://script.google.com/macros/s/AKfycbx4jchhNosP2vCpL0RV46fOqVX4LWCnVrXLkXIMyi7YIkw0NHxyfChO0HqyFbk480K7Yw/exec?' + params.toString();
-
-          const script = document.createElement("script");
-          script.src = url;
-          document.body.appendChild(script);
+        } else {
+          // create - POST
+          res = await fetch(API_URL, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ data: [termin] }),
+          });
         }
+        if (!res.ok) throw new Error("Neuspešno čuvanje");
+        alert("Uspešno sačuvano!");
+        loadTermini();
+      } catch (err) {
+        alert("Greška pri čuvanju: " + err.message);
+      }
+    }
+
+    // Obriši termin po id-u
+    async function deleteTermin(id) {
+      if (!confirm("Da li ste sigurni da želite da obrišete ovaj termin?")) return;
+      try {
+        const res = await fetch(`${API_URL}/row/${id}`, {
+          method: "DELETE"
+        });
+        if (!res.ok) throw new Error("Neuspešno brisanje");
+        alert("Termin obrisan.");
+        loadTermini();
+      } catch (err) {
+        alert("Greška pri brisanju: " + err.message);
+      }
+    }
+
+    // Renderuj termine u kartice
+    async function loadTermini() {
+      const termini = await fetchTermini();
+      const container = document.getElementById("terminiContainer");
+      container.innerHTML = "";
+
+      termini.forEach(t => {
+        const card = document.createElement("div");
+        card.className = "terminCard";
+
+        // Uglavnom čuvamo id za brisanje i update
+        const id = t._id;
+
+        card.innerHTML = `
+          <label>Datum:</label>
+          <input type="date" value="${t.Datum || ''}" />
+          <label>Vreme:</label>
+          <input type="time" value="${t.Vreme || ''}" />
+          <label>Šifra stana:</label>
+          <input type="text" value="${t['Šifra stana'] || ''}" />
+          <label>Agent:</label>
+          <input type="text" value="${t.Agent || ''}" />
+          <label>Adresa:</label>
+          <input type="text" value="${t.Adresa || ''}" />
+          <label>Telefon:</label>
+          <input type="tel" value="${t.Telefon || ''}" />
+          <label>
+            <input type="checkbox" ${t.Slikano === "Da" ? "checked" : ""} /> Slikano
+          </label>
+          <div class="btnGroup">
+            <button class="saveBtn">Sačuvaj</button>
+            <button class="deleteBtn">Obriši</button>
+          </div>
+        `;
+
+        // Dodaj event za sacuvaj
+        card.querySelector(".saveBtn").addEventListener("click", () => {
+          const inputs = card.querySelectorAll("input");
+          const noviTermin = {
+            Datum: inputs[0].value,
+            Vreme: inputs[1].value,
+            "Šifra stana": inputs[2].value,
+            Agent: inputs[3].value,
+            Adresa: inputs[4].value,
+            Telefon: inputs[5].value,
+            Slikano: inputs[6].checked ? "Da" : "Ne",
+          };
+          saveTermin(noviTermin, id);
+        });
+
+        // Dodaj event za obrisi
+        card.querySelector(".deleteBtn").addEventListener("click", () => {
+          deleteTermin(id);
+        });
+
+        container.appendChild(card);
       });
 
-      alert("Sačuvano!");
+      // Dodaj praznu karticu za novi termin
+      const newCard = document.createElement("div");
+      newCard.className = "terminCard";
+      newCard.innerHTML = `
+          <label>Datum:</label>
+          <input type="date" />
+          <label>Vreme:</label>
+          <input type="time" />
+          <label>Šifra stana:</label>
+          <input type="text" />
+          <label>Agent:</label>
+          <input type="text" />
+          <label>Adresa:</label>
+          <input type="text" />
+          <label>Telefon:</label>
+          <input type="tel" />
+          <label>
+            <input type="checkbox" /> Slikano
+          </label>
+          <div class="btnGroup">
+            <button class="saveBtn">Sačuvaj</button>
+          </div>
+      `;
+      newCard.querySelector(".saveBtn").addEventListener("click", () => {
+        const inputs = newCard.querySelectorAll("input");
+        const noviTermin = {
+          Datum: inputs[0].value,
+          Vreme: inputs[1].value,
+          "Šifra stana": inputs[2].value,
+          Agent: inputs[3].value,
+          Adresa: inputs[4].value,
+          Telefon: inputs[5].value,
+          Slikano: inputs[6].checked ? "Da" : "Ne",
+        };
+        saveTermin(noviTermin, null);
+      });
+      container.appendChild(newCard);
     }
 
-    function loadTermini() {
-      const datum = document.getElementById("datum").value;
-      if (!datum) return alert("Unesi datum!");
-
-      const url = `https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec?action=load&datum=${datum}&callback=ucitaj`;
-
-      const script = document.createElement("script");
-      script.src = url.replace('action=load', 'callback=ucitaj');
-      document.body.appendChild(script);
-    }
-
-    function ucitaj(data) {
-      const datum = document.getElementById("datum").value;
-      const filtrirano = data.filter(x => x.datum === datum);
-      renderGrid(filtrirano);
-    }
+    loadTermini();
   </script>
+
 </body>
 </html>
