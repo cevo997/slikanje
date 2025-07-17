@@ -1,175 +1,151 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Zakazivanje Slikanja</title>
+  <meta charset="UTF-8">
+  <title>Zakazivanje slikanja</title>
   <style>
     body {
       font-family: sans-serif;
       padding: 20px;
-      background: #f0f0f0;
-    }
-    .selector {
-      margin-bottom: 20px;
+      background: #f5f5f5;
     }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 15px;
+      gap: 12px;
     }
-    .kartica {
+    .card {
       background: white;
-      border: 1px solid #ccc;
-      padding: 15px;
-      border-radius: 10px;
+      padding: 12px;
+      border-radius: 8px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: background 0.3s;
     }
-    .zatamnjeno {
-      background: #ccc;
-      opacity: 0.6;
+    .card.dim {
+      background: #d3d3d3;
     }
-    label {
-      display: block;
-      margin-top: 5px;
-    }
-    select, input[type="text"], input[type="tel"] {
+    .card input, .card select {
       width: 100%;
-      padding: 5px;
-      margin-top: 2px;
+      padding: 4px;
+      margin: 4px 0;
     }
-    .brojaci {
-      margin-top: 20px;
-      font-weight: bold;
+    .card button {
+      margin-top: 6px;
+      width: 100%;
+      padding: 6px;
     }
-    button {
-      margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
     }
   </style>
 </head>
 <body>
-  <h1>Zakazivanje Slikanja</h1>
-  <div class="selector">
-    <label for="izborDatuma">Izaberi datum:</label>
-    <input type="date" id="izborDatuma" />
+  <div class="header">
+    <h1>Zakazivanje slikanja</h1>
+    <input type="date" id="datum" />
   </div>
-  <div id="grid" class="grid"></div>
-  <button onclick="sacuvaj()">Sačuvaj</button>
-  <div id="brojaci" class="brojaci"></div>
-<script>
-const API_URL = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
-const termini = generisiTermine();
-const agenti = ["SAŠKA","CECA","LJILJA","RUŽA","SEKA","SANDRA","NIKOLA","ANĐELA","ATINA","VIŠNJA","MILA","BUDA","NATAŠA"];
-let podaci = [];
+  <div id="termini" class="grid"></div>
 
-document.getElementById("izborDatuma").valueAsDate = new Date();
-document.getElementById("izborDatuma").addEventListener("change", ucitajPodatke);
-
-function generisiTermine() {
-  let list = [];
-  for (let h = 9; h <= 19; h++) {
-    list.push(`${h.toString().padStart(2, "0")}:00`);
-    list.push(`${h.toString().padStart(2, "0")}:30`);
-  }
-  return list;
-}
-
-function ucitajPodatke() {
-  const datum = document.getElementById("izborDatuma").value;
-  fetch(`${API_URL}?date=${datum}`)
-    .then(res => res.json())
-    .then(data => {
-      podaci = data;
-      prikaziTermine(datum);
+  <script>
+    const API_URL = 'https://sheetdb.io/api/v1/ywvbhlm9ikdui';
+    const agenti = ["SAŠKA", "CECA", "LJILJA", "RUŽA", "SEKA", "SANDRA", "NIKOLA", "ANĐELA", "ATINA", "VIŠNJA", "MILA", "BUDA", "NATAŠA"];
+    const vremena = Array.from({length: 22}, (_, i) => {
+      let h = 9 + Math.floor(i / 2);
+      let m = i % 2 === 0 ? '00' : '30';
+      return `${String(h).padStart(2, '0')}:${m}`;
     });
-}
 
-function prikaziTermine(datum) {
-  const grid = document.getElementById("grid");
-  grid.innerHTML = "";
-  const brojaci = {};
+    let sviPodaci = [];
 
-  termini.forEach(vreme => {
-    const entry = podaci.find(e => e.date === datum && e.time === vreme) || {};
-    const div = document.createElement("div");
-    div.className = "kartica";
-    div.innerHTML = `
-      <h4>${vreme}</h4>
-      <label>Šifra: <input type="text" value="${entry.sifra || ""}" /></label>
-      <label>Adresa: <input type="text" value="${entry.adresa || ""}" /></label>
-      <label>Telefon: <input type="tel" value="${entry.telefon || ""}" /></label>
-      <label>Agent:
-        <select>
-          <option value=""></option>
-          ${agenti.map(a => `<option value="${a}" ${entry.agent === a ? "selected" : ""}>${a}</option>`).join("")}
-        </select>
-      </label>
-      <label><input type="checkbox" ${entry.slikano === "DA" ? "checked" : ""}/> Slikano</label>
-    `;
-    if (entry.slikano === "DA") div.classList.add("zatamnjeno");
-    div.dataset.vreme = vreme;
-    grid.appendChild(div);
+    document.getElementById('datum').valueAsDate = new Date();
+    document.getElementById('datum').addEventListener('change', ucitajTermine);
 
-    // broji agente
-    if (entry.slikano === "DA" && entry.agent) {
-      brojaci[entry.agent] = (brojaci[entry.agent] || 0) + 1;
-    }
+    async function ucitajTermine() {
+      const datum = document.getElementById('datum').value;
+      const res = await fetch(`${API_URL}?search=Datum&value=${datum}`);
+      sviPodaci = await res.json();
 
-    // proveri za slanje maila
-    const danas = new Date();
-    const terminDatum = new Date(datum);
-    const diff = (danas - terminDatum) / (1000 * 60 * 60 * 24);
-    if (diff > 2 && entry.slikano !== "DA" && entry.sifra) {
-      fetch("https://formsubmit.co/ajax/stefanbarac@gmail.com", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: "Nije slikano!",
-          message: `Stan ${entry.sifra} na adresi ${entry.adresa || "nepoznato"} NIJE slikano (${datum} ${vreme})`
-        })
+      const container = document.getElementById('termini');
+      container.innerHTML = '';
+
+      vremena.forEach(vreme => {
+        const podatak = sviPodaci.find(p => p.Vreme === vreme);
+        const div = document.createElement('div');
+        div.className = 'card';
+        if (podatak && podatak.Slikano === 'Da') div.classList.add('dim');
+
+        div.innerHTML = `
+          <strong>${vreme}</strong>
+          <input placeholder="Šifra stana" value="${podatak?.['Šifra stana'] || ''}" />
+          <select>
+            <option value="">-- Agent --</option>
+            ${agenti.map(a => `<option value="${a}" ${podatak?.Agent === a ? 'selected' : ''}>${a}</option>`).join('')}
+          </select>
+          <input placeholder="Adresa" value="${podatak?.Adresa || ''}" />
+          <input placeholder="Telefon" value="${podatak?.Telefon || ''}" />
+          <label><input type="checkbox" ${podatak?.Slikano === 'Da' ? 'checked' : ''} /> Slikano</label>
+          <button>Sačuvaj</button>
+        `;
+
+        const [sifra, agent, adresa, telefon] = div.querySelectorAll('input, select');
+        const slikano = div.querySelector('input[type="checkbox"]');
+        const dugme = div.querySelector('button');
+
+        slikano.addEventListener('change', () => {
+          div.classList.toggle('dim', slikano.checked);
+        });
+
+        dugme.onclick = async () => {
+          const podaci = {
+            Datum: datum,
+            Vreme: vreme,
+            "Šifra stana": sifra.value,
+            Agent: agent.value,
+            Adresa: adresa.value,
+            Telefon: telefon.value,
+            Slikano: slikano.checked ? 'Da' : 'Ne'
+          };
+
+          const postoji = sviPodaci.find(p => p.Vreme === vreme);
+          if (postoji) {
+            // Update
+            await fetch(`${API_URL}/search?Datum=${datum}&Vreme=${vreme}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data: podaci })
+            });
+          } else {
+            // Insert
+            await fetch(API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data: podaci })
+            });
+          }
+          alert('Sačuvano');
+        };
+
+        container.appendChild(div);
       });
+
+      prikaziBrojSlikanih();
     }
-  });
 
-  // prikaz brojača
-  const brojaciDiv = document.getElementById("brojaci");
-  brojaciDiv.innerHTML = "Broj stanova po agentu: " + Object.entries(brojaci).map(([a, b]) => `${a}: ${b}`).join(", ");
-}
-
-function sacuvaj() {
-  const datum = document.getElementById("izborDatuma").value;
-  const kartice = document.querySelectorAll(".kartica");
-
-  kartice.forEach(div => {
-    const vreme = div.dataset.vreme;
-    const sifra = div.querySelector("input[type='text']").value;
-    const adresa = div.querySelectorAll("input")[1].value;
-    const telefon = div.querySelector("input[type='tel']").value;
-    const agent = div.querySelector("select").value;
-    const slikano = div.querySelector("input[type='checkbox']").checked ? "DA" : "";
-
-    fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: {
-          date: datum,
-          time: vreme,
-          sifra,
-          adresa,
-          telefon,
-          agent,
-          slikano
+    function prikaziBrojSlikanih() {
+      const brojac = {};
+      sviPodaci.forEach(p => {
+        if (p.Slikano === 'Da' && p.Agent) {
+          brojac[p.Agent] = (brojac[p.Agent] || 0) + 1;
         }
-      })
-    });
-  });
+      });
+      console.log('Broj slikanih po agentima:', brojac);
+    }
 
-  setTimeout(() => ucitajPodatke(), 1000);
-}
-
-ucitajPodatke();
-</script>
+    // Pokreni odmah
+    ucitajTermine();
+  </script>
 </body>
 </html>
