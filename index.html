@@ -2,137 +2,139 @@
 <html lang="sr">
 <head>
   <meta charset="UTF-8" />
-  <title>Zakazivanje slikanja</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Zakazivanje Slikanja</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
-    .termin { background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 0 6px #ccc; margin-bottom: 10px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; align-items: center; transition: 0.3s; }
-    .termin.zatamnjeno { background: #e0e0e0; opacity: 0.6; }
-    label { display: block; font-size: 14px; }
-    select, input[type="text"], input[type="tel"] { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 5px; }
-    .selector { margin-bottom: 20px; }
-    .btn-sacuvaj { margin-top: 20px; padding: 10px 20px; background: #007bff; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
-    .brojac { margin-top: 20px; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 0 6px #ccc; }
+    body { font-family: sans-serif; background: #f2f2f2; margin: 0; padding: 20px; }
+    h1 { text-align: center; }
+    #izborDatuma { margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+    .kartica {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+    .zatamnjeno {
+      background: #d3d3d3;
+    }
+    label { display: block; margin-top: 5px; }
+    input, select { width: 100%; padding: 5px; margin-top: 3px; }
+    button { margin-top: 10px; width: 100%; padding: 7px; background: #007bff; color: white; border: none; border-radius: 4px; }
+    #brojanje { margin-top: 20px; background: #fff; padding: 10px; border-radius: 6px; }
   </style>
 </head>
 <body>
-  <h1>Zakazivanje slikanja</h1>
-  <div class="selector">
-    <label for="izborDatuma">Izaberi datum:</label>
-    <input type="date" id="izborDatuma" />
-  </div>
-  <div id="termini"></div>
-  <button class="btn-sacuvaj" onclick="sacuvajTermine()">Sačuvaj</button>
-  <div class="brojac" id="brojacAgenta"></div>
+  <h1>Zakazivanje Slikanja</h1>
+  <label for="izborDatuma">Izaberi datum:</label>
+  <input type="date" id="izborDatuma"/>
 
-<script>
-const apiURL = "https://sheetdb.io/api/v1/ywvbhlm9ikdui";
-const agenti = ["SAŠKA","CECA","LJILJA","RUŽA","SEKA","SANDRA","NIKOLA","ANĐELA","ATINA","VIŠNJA","MILA","BUDA","NATAŠA"];
-const vremena = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"];
-const terminiDiv = document.getElementById("termini");
+  <div class="grid" id="sviTermini"></div>
 
-document.getElementById("izborDatuma").valueAsDate = new Date();
-ucitajTermine();
+  <div id="brojanje"></div>
 
-document.getElementById("izborDatuma").addEventListener("change", ucitajTermine);
+  <script>
+    const API_URL = 'https://sheetdb.io/api/v1/ywvbhlm9ikdui';
+    const TERMINI = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"];
+    const AGENTI = ["SAŠKA","CECA","LJILJA","RUŽA","SEKA","SANDRA","NIKOLA","ANĐELA","ATINA","VIŠNJA","MILA","BUDA","NATAŠA"];
+    const emailZaObavestenje = "stefanbarac@gmail.com";
+    let trenutnoOdabraniDatum;
 
-function ucitajTermine() {
-  const datum = document.getElementById("izborDatuma").value;
-  fetch(`${apiURL}?search=Datum&value=${datum}`)
-    .then(res => res.json())
-    .then(podaci => {
-      terminiDiv.innerHTML = "";
+    document.getElementById("izborDatuma").valueAsDate = new Date();
+    document.getElementById("izborDatuma").addEventListener("change", ucitajTermine);
+
+    ucitajTermine();
+
+    async function ucitajTermine() {
+      const datum = document.getElementById("izborDatuma").value;
+      trenutnoOdabraniDatum = datum;
+      const response = await fetch(`${API_URL}?date=${datum}`);
+      const podaci = await response.json();
+      const container = document.getElementById("sviTermini");
+      container.innerHTML = "";
+
       const agentBrojac = {};
-      vremena.forEach(vreme => {
-        const podatak = podaci.find(t => t.Vreme === vreme);
+      TERMINI.forEach(vreme => {
+        const postojeci = podaci.find(p => p.Datum === datum && p.Vreme === vreme) || {};
         const div = document.createElement("div");
-        div.className = "termin";
-        if (podatak?.Slikano === "TRUE") div.classList.add("zatamnjeno");
-
+        div.className = "kartica";
         div.innerHTML = `
-          <div><label>Vreme</label><div>${vreme}</div></div>
-          <div><label>Šifra</label><input type="text" value="${podatak?.["Šifra stana"] || ""}" /></div>
-          <div><label>Agent</label>
-            <select>
-              <option value="">--</option>
-              ${agenti.map(a => `<option ${podatak?.Agent === a ? "selected" : ""}>${a}</option>`).join("")}
+          <strong>${vreme}</strong>
+          <label>Šifra stana: <input value="${postojeci['Šifra stana'] || ""}" class="sifra"/></label>
+          <label>Agent:
+            <select class="agent">
+              <option value="">--izaberi--</option>
+              ${AGENTI.map(a => `<option ${a === postojeci.Agent ? "selected" : ""}>${a}</option>`).join("")}
             </select>
-          </div>
-          <div><label>Adresa</label><input type="text" value="${podatak?.Adresa || ""}" /></div>
-          <div><label>Telefon</label><input type="tel" value="${podatak?.Telefon || ""}" /></div>
-          <div>
-            <label>Slikano</label>
-            <input type="checkbox" ${podatak?.Slikano === "TRUE" ? "checked" : ""} onchange="this.closest('.termin').classList.toggle('zatamnjeno', this.checked)" />
-          </div>
+          </label>
+          <label>Adresa: <input value="${postojeci.Adresa || ""}" class="adresa"/></label>
+          <label>Telefon: <input value="${postojeci.Telefon || ""}" class="telefon"/></label>
+          <label><input type="checkbox" class="slikano" ${postojeci.Slikano === "TRUE" ? "checked" : ""}/> Slikano</label>
+          <button class="sacuvaj">Sačuvaj</button>
         `;
-        terminiDiv.appendChild(div);
 
-        // brojanje po agentu
-        const agentIme = podatak?.Agent;
-        if (podatak?.Slikano === "TRUE" && agentIme) {
-          agentBrojac[agentIme] = (agentBrojac[agentIme] || 0) + 1;
-        }
+        if (postojeci.Slikano === "TRUE") div.classList.add("zatamnjeno");
 
-        // automatski email ako je starije od 2 dana i nije slikano
-        if (!podatak?.Slikano && isStarijeOd2Dana(datum)) {
-          fetch(`https://formspree.io/f/mnqenrwl`, {
+        const check = div.querySelector(".slikano");
+        check.addEventListener("change", () => {
+          if (check.checked) div.classList.add("zatamnjeno");
+          else div.classList.remove("zatamnjeno");
+        });
+
+        const dugme = div.querySelector(".sacuvaj");
+        dugme.addEventListener("click", async () => {
+          const sifra = div.querySelector(".sifra").value;
+          const agent = div.querySelector(".agent").value;
+          const adresa = div.querySelector(".adresa").value;
+          const telefon = div.querySelector(".telefon").value;
+          const slikano = div.querySelector(".slikano").checked;
+          const payload = {
+            Datum: datum,
+            Vreme: vreme,
+            "Šifra stana": sifra,
+            Agent: agent,
+            Adresa: adresa,
+            Telefon: telefon,
+            Slikano: slikano ? "TRUE" : "FALSE"
+          };
+          await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: [payload] })
+          });
+          alert("Sačuvano!");
+          ucitajTermine();
+        });
+
+        if (postojeci.Slikano === "TRUE" && postojeci.Agent) {
+          agentBrojac[postojeci.Agent] = (agentBrojac[postojeci.Agent] || 0) + 1;
+        }
+
+        // Provera za email (ako starije od 2 dana i nije slikano)
+        const danas = new Date();
+        const datumObj = new Date(datum);
+        const diff = Math.floor((danas - datumObj) / (1000 * 60 * 60 * 24));
+        if (diff > 2 && postojeci.Slikano !== "TRUE" && postojeci['Šifra stana']) {
+          fetch(`https://formsubmit.co/ajax/${emailZaObavestenje}`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email: "stefanbarac@gmail.com",
-              message: `Termin ${vreme} na datum ${datum} nije označen kao Slikano.`
+              subject: "Nije slikano starije od 2 dana",
+              message: `Stan ${postojeci['Šifra stana']} (${postojeci.Adresa}) nije slikano od ${datum} u ${vreme}.`
             })
           });
         }
+
+        container.appendChild(div);
       });
 
-      prikaziBrojac(agentBrojac);
-    });
-}
-
-function prikaziBrojac(brojac) {
-  const el = document.getElementById("brojacAgenta");
-  el.innerHTML = "<h3>Broj slikanih po agentima:</h3>" +
-    Object.entries(brojac).map(([agent, br]) => `<div>${agent}: ${br}</div>`).join("");
-}
-
-function isStarijeOd2Dana(datumStr) {
-  const danas = new Date();
-  const datum = new Date(datumStr);
-  const razlika = (danas - datum) / (1000 * 60 * 60 * 24);
-  return razlika > 2;
-}
-
-function sacuvajTermine() {
-  const datum = document.getElementById("izborDatuma").value;
-  const kartice = document.querySelectorAll(".termin");
-  kartice.forEach(k => {
-    const vreme = k.children[0].textContent.trim();
-    const sifra = k.querySelector("input[type='text']").value.trim();
-    const agent = k.querySelector("select").value.trim();
-    const adresa = k.querySelectorAll("input[type='text']")[1].value.trim();
-    const telefon = k.querySelector("input[type='tel']").value.trim();
-    const slikano = k.querySelector("input[type='checkbox']").checked ? "TRUE" : "";
-
-    if (!sifra && !agent && !adresa && !telefon && !slikano) return; // preskoči prazne
-
-    fetch(apiURL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: {
-          Datum: datum,
-          Vreme: vreme,
-          "Šifra stana": sifra,
-          Agent: agent,
-          Adresa: adresa,
-          Telefon: telefon,
-          Slikano: slikano
-        }
-      })
-    });
-  });
-  alert("Termini su sačuvani!");
-}
-</script>
+      // Prikaz broja stanova po agentu
+      const brojacDiv = document.getElementById("brojanje");
+      brojacDiv.innerHTML = "<h3>Broj slikanih stanova po agentu:</h3><ul>" +
+        Object.entries(agentBrojac).map(([agent, broj]) => `<li>${agent}: ${broj}</li>`).join("") +
+        "</ul>";
+    }
+  </script>
 </body>
 </html>
